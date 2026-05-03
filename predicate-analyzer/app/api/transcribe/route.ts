@@ -51,9 +51,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing audio file." }, { status: 400 });
   }
 
+  const audioFile = file as File;
+
   async function submit(modelName: string) {
     const attempt = new FormData();
-    attempt.append("file", file);
+    attempt.append("file", audioFile);
     attempt.append("model", modelName);
     attempt.append("response_format", responseFormat);
     if (responseFormat === "verbose_json") {

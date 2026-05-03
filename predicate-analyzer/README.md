@@ -15,7 +15,7 @@ Standalone Next.js MVP for meeting transcription, summary extraction, and predic
 Create a local environment file from [`./.env.local.example`](./.env.local.example) and set:
 
 - `OPENAI_API_KEY`
-- If you choose Firebase later, fill the `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_*` entries.
+- If you choose Firebase, fill the `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_*` entries.
 - If you choose Supabase later, fill the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` entries.
 
 That single key powers both:
@@ -38,6 +38,27 @@ Recommended default for this app:
 - Use Firebase as the source of truth.
 - If you later need Supabase, sync from Firebase through jobs, webhooks, or an event pipeline.
 - Avoid dual-writes unless you have a specific sync pipeline and a clear ownership model.
+
+## Firebase setup
+
+1. Create a Firebase project.
+2. Add a Web app in Firebase and copy the web config values into:
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+3. Enable **Anonymous** sign-in in Firebase Authentication.
+4. Create a Firestore database in production mode.
+5. Create a service account and copy these into the server-side env:
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_CLIENT_EMAIL`
+   - `FIREBASE_PRIVATE_KEY`
+6. If you want file uploads later, enable Firebase Storage too.
+7. Keep the app on `STORAGE_PROVIDER=firebase` so Firebase stays the source of truth.
+
+The app now uses Firebase Auth to mint an anonymous browser session, then saves and reloads meetings through the `/api/meetings` route.
 
 ## Notes on live mode
 
@@ -62,9 +83,11 @@ Before running a Vercel or Hostinger build:
 2. For Hostinger, copy [`./.env.hostinger.example`](./.env.hostinger.example) into the Hostinger environment-variable UI.
 3. Set `OPENAI_API_KEY`.
 4. Set `NEXT_PUBLIC_APP_URL=https://dealiq.mindscoach.com`.
-5. Keep Firebase as the active storage provider for now.
-6. Verify microphone permissions in the browser.
-7. Smoke-test upload, record, and live mode once the app is deployed.
+5. Fill the Firebase web config env vars.
+6. Fill the Firebase service account env vars.
+7. Keep Firebase as the active storage provider for now.
+8. Verify microphone permissions in the browser.
+9. Smoke-test upload, record, live mode, Firebase save, and meeting reload once the app is deployed.
 
 ## Hostinger
 
@@ -81,4 +104,5 @@ If you are deploying to Hostinger:
 2. Produce a transcript.
 3. Generate meeting notes and key points.
 4. Score Visual, Auditory, Kinesthetic, and Auditory Digital signals.
-5. Export the combined report as Markdown or PDF.
+5. Save the meeting to Firebase and reload it later.
+6. Export the combined report as Markdown or PDF.

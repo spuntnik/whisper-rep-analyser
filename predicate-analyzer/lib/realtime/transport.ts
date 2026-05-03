@@ -44,9 +44,18 @@ function parseEvent(data: unknown): RealtimeTransportEvent {
   const end = typeof event.end === "number" ? event.end : undefined;
 
   if (type === "error") {
+    const errorDetails = event.error;
+    const errorMessage =
+      typeof errorDetails === "object" &&
+      errorDetails !== null &&
+      "message" in errorDetails &&
+      typeof (errorDetails as { message?: unknown }).message === "string"
+        ? String((errorDetails as { message?: unknown }).message)
+        : "Realtime error";
+
     return {
       kind: "error",
-      message: String(event.error?.message ?? "Realtime error"),
+      message: errorMessage,
       details: event,
     };
   }
@@ -86,7 +95,7 @@ function parseEvent(data: unknown): RealtimeTransportEvent {
   if (type === "session.created" || type === "session.updated") {
     return {
       kind: "session",
-      session: event as RealtimeSessionResponse,
+      session: event as unknown as RealtimeSessionResponse,
     };
   }
 

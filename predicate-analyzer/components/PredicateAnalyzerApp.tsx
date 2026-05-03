@@ -6,6 +6,8 @@ import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
 import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
+import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
+import type { FirebaseMeetingSummary } from "@/lib/firebase/meetings";
 import { LiveTranscriptStream } from "@/components/LiveTranscriptStream";
 import { MeetingReport } from "@/components/MeetingReport";
 import { PieChart } from "@/components/PieChart";
@@ -44,13 +46,20 @@ export function PredicateAnalyzerApp() {
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [firebaseAuthStatus, setFirebaseAuthStatus] = useState("Firebase pending");
+  const [firebaseToken, setFirebaseToken] = useState<string | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [recentMeetings, setRecentMeetings] = useState<FirebaseMeetingSummary[]>([]);
+  const [meetingsStatus, setMeetingsStatus] = useState<string | null>(null);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
   const realtime = useRealtimeMeeting({ model: "gpt-realtime-1.5" });
-  const firebaseReady = useMemo(() => Boolean(getFirebaseClientServices()), []);
+  const firebaseServices = useMemo(() => getFirebaseClientServices(), []);
+  const firebaseReady = Boolean(firebaseServices);
 
   useEffect(() => {
     setCanRecord(
@@ -59,6 +68,61 @@ export function PredicateAnalyzerApp() {
         typeof MediaRecorder !== "undefined",
     );
   }, []);
+
+  useEffect(() => {
+    if (!firebaseServices) {
+      setFirebaseAuthStatus("Firebase pending");
+      return;
+    }
+
+    const auth = firebaseServices.auth;
+    let active = true;
+
+    setFirebaseAuthStatus("Signing into Firebase...");
+
+    void signInAnonymously(auth).catch(() => {
+      // If a session already exists, onAuthStateChanged will still hydrate it.
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!active) return;
+
+      if (!user) {
+        setFirebaseUser(null);
+        setFirebaseToken(null);
+        setFirebaseAuthStatus("Firebase auth pending");
+        return;
+      }
+
+      setFirebaseUser(user);
+
+      try {
+        const token = await user.getIdToken();
+        if (!active) return;
+
+        setFirebaseToken(token);
+        setFirebaseAuthStatus(
+          user.isAnonymous
+            ? `Firebase anonymous session ${user.uid.slice(0, 8)}`
+            : `Firebase user ${user.uid.slice(0, 8)}`,
+        );
+        void refreshRecentMeetings(token);
+      } catch (error) {
+        if (!active) return;
+
+        setFirebaseToken(null);
+        setFirebaseAuthStatus(
+          error instanceof Error ? error.message : "Unable to authenticate with Firebase.",
+        );
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebaseServices]);
 
   useEffect(() => {
     return () => {
@@ -305,9 +369,48 @@ export function PredicateAnalyzerApp() {
     window.print();
   }
 
+  async function refreshRecentMeetings(token = firebaseToken) {
+    if (!token) {
+      setRecentMeetings([]);
+      setMeetingsStatus("Sign in to Firebase to view saved meetings.");
+      return;
+    }
+
+    setMeetingsStatus("Loading saved meetings...");
+
+    try {
+      const response = await fetch("/api/meetings", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Unable to load saved meetings.");
+      }
+
+      const data = (await response.json()) as { meetings?: FirebaseMeetingSummary[] };
+      const meetings = data.meetings ?? [];
+      setRecentMeetings(meetings);
+      setMeetingsStatus(
+        meetings.length
+          ? `Loaded ${meetings.length} saved meeting${meetings.length === 1 ? "" : "s"}.`
+          : "No saved meetings yet.",
+      );
+    } catch (error) {
+      setMeetingsStatus(error instanceof Error ? error.message : "Unable to load saved meetings.");
+    }
+  }
+
   async function saveCurrentWorkflow() {
     if (!workflow) {
       setSaveStatus("Nothing to save yet.");
+      return;
+    }
+
+    if (!firebaseToken) {
+      setSaveStatus("Firebase sign-in is still starting. Try again in a moment.");
       return;
     }
 
@@ -318,6 +421,7 @@ export function PredicateAnalyzerApp() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${firebaseToken}`,
         },
         body: JSON.stringify({
           workflow,
@@ -333,8 +437,53 @@ export function PredicateAnalyzerApp() {
 
       const data = (await response.json()) as { id?: string };
       setSaveStatus(data.id ? `Saved to Firebase as ${data.id}.` : "Saved to Firebase.");
+      void refreshRecentMeetings(firebaseToken);
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : "Unable to save meeting to Firebase.");
+    }
+  }
+
+  async function loadSavedMeeting(meetingId: string) {
+    if (!firebaseToken) {
+      setMeetingsStatus("Firebase sign-in is still starting.");
+      return;
+    }
+
+    setSelectedMeetingId(meetingId);
+    setMeetingsStatus("Loading meeting...");
+
+    try {
+      const response = await fetch(`/api/meetings?id=${encodeURIComponent(meetingId)}`, {
+        headers: {
+          Authorization: `Bearer ${firebaseToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Unable to load meeting.");
+      }
+
+      const data = (await response.json()) as {
+        meeting?: FirebaseMeetingSummary;
+        transcript?: string;
+        segments?: TranscriptSegment[];
+      };
+
+      if (!data.meeting) {
+        throw new Error("Meeting payload was incomplete.");
+      }
+
+      setCaptureMode(data.meeting.captureMode);
+      setSourceLabel(data.meeting.sourceLabel);
+      setTextInput(data.transcript ?? "");
+      setSegments(data.segments ?? []);
+      setStatusMessage(`Loaded ${data.meeting.title}.`);
+      setErrorMessage(null);
+      setSaveStatus(`Loaded meeting ${data.meeting.id}.`);
+      setMeetingsStatus(`Loaded ${data.meeting.title}.`);
+    } catch (error) {
+      setMeetingsStatus(error instanceof Error ? error.message : "Unable to load meeting.");
     }
   }
 
@@ -348,6 +497,8 @@ export function PredicateAnalyzerApp() {
     setStatusMessage("Ready");
     setErrorMessage(null);
     setSaveStatus(null);
+    setMeetingsStatus(null);
+    setSelectedMeetingId(null);
   }
 
   return (
@@ -568,9 +719,79 @@ export function PredicateAnalyzerApp() {
                 {workflow ? "Report ready" : "Waiting for transcript"}
               </div>
               <div className="rounded-full bg-[#1F63AA] px-4 py-2 text-sm font-semibold text-white">
-                {firebaseReady ? "Firebase ready" : "Firebase pending"}
+                {firebaseReady ? firebaseAuthStatus : "Firebase pending"}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-white/10 bg-[#E6DBBD] p-6 text-[#303F4B] shadow-glow print:hidden">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold">Saved meetings</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#303F4B]/75">
+                Firebase is the source of truth. Anonymous auth keeps this browser session scoped,
+                and the saved report list can be reopened into the current view.
+              </p>
+            </div>
+            <div className="rounded-full bg-[#303F4B] px-4 py-2 text-sm font-semibold text-[#E6DBBD]">
+              {firebaseUser ? `User ${firebaseUser.uid.slice(0, 8)}` : "No Firebase user"}
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3 text-sm">
+            <div className="rounded-full bg-[#535E8D] px-4 py-2 font-semibold text-white">
+              {meetingsStatus ?? "Ready to load saved meetings"}
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshRecentMeetings()}
+              disabled={!firebaseToken}
+              className="rounded-full border border-[#303F4B]/15 bg-white/55 px-4 py-2 font-semibold text-[#303F4B] transition hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Refresh list
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {recentMeetings.length > 0 ? (
+              recentMeetings.map((meeting) => (
+                <button
+                  key={meeting.id}
+                  type="button"
+                  onClick={() => void loadSavedMeeting(meeting.id)}
+                  className={`rounded-3xl border p-4 text-left transition ${
+                    selectedMeetingId === meeting.id
+                      ? "border-[#1F63AA] bg-white shadow-lg"
+                      : "border-[#303F4B]/10 bg-white/75 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.22em] text-[#535E8D]">
+                        {meeting.captureMode}
+                      </div>
+                      <div className="mt-1 text-base font-semibold">{meeting.title}</div>
+                    </div>
+                    <div className="rounded-full bg-[#FF7F00] px-3 py-1 text-xs font-semibold text-[#303F4B]">
+                      {meeting.confidence}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-sm text-[#303F4B]/70">{meeting.sourceLabel}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#303F4B]/65">
+                    <span>{new Date(meeting.createdAt).toLocaleString()}</span>
+                    <span>•</span>
+                    <span>{meeting.buyingChannel}</span>
+                    <span>•</span>
+                    <span>{meeting.gap.toFixed(1)}% gap</span>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-3xl border border-dashed border-[#303F4B]/15 bg-white/45 p-5 text-sm text-[#303F4B]/70">
+                No saved meetings yet. Save a report to Firebase to start building this list.
+              </div>
+            )}
           </div>
         </section>
       </div>

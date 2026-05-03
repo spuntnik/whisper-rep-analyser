@@ -29,6 +29,10 @@ export function getFirebaseAdminAuth() {
   return getAuth(getAdminApp());
 }
 
+export async function verifyFirebaseIdToken(idToken: string) {
+  return getFirebaseAdminAuth().verifyIdToken(idToken);
+}
+
 export function getFirebaseAdminStorage() {
   return getStorage(getAdminApp());
 }
