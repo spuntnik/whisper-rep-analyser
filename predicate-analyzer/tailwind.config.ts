@@ -9,20 +9,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: "#1c2a4a",
-        primary: "#c9937d",
-        secondary: "#1a7a8a",
-        visual: "#c9937d",
-        auditory: "#1a7a8a",
-        kinesthetic: "#34d399",
-        auditoryDigital: "#a78bfa",
+        canvas: "#303F4B",
+        pearl: "#E6DBBD",
+        orange: "#FF7F00",
+        blue: "#1F63AA",
+        violet: "#535E8D",
+        charcoal: "#303F4B",
       },
       boxShadow: {
-        glow: "0 18px 60px rgba(25, 32, 62, 0.45)",
+        glow: "0 18px 60px rgba(48, 63, 75, 0.30)",
       },
       backgroundImage: {
         aura:
-          "radial-gradient(circle at top left, rgba(201,147,125,0.20), transparent 28%), radial-gradient(circle at right 20%, rgba(26,122,138,0.18), transparent 24%), linear-gradient(180deg, #22355c 0%, #1c2a4a 52%, #132038 100%)",
+          "radial-gradient(circle at top left, rgba(83,94,141,0.35), transparent 24%), radial-gradient(circle at right 20%, rgba(255,127,0,0.18), transparent 24%), linear-gradient(180deg, #4f5b80 0%, #303F4B 60%, #202a33 100%)",
       },
     },
   },

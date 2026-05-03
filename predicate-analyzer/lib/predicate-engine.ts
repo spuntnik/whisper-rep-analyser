@@ -38,7 +38,7 @@ const CHANNELS: ChannelConfig[] = [
   {
     key: "visual",
     label: "Visual",
-    color: "#c9937d",
+    color: "#535E8D",
     buyingChannel: "Visual Trust",
     phrases: [
       "let me show you",
@@ -53,7 +53,7 @@ const CHANNELS: ChannelConfig[] = [
   {
     key: "auditory",
     label: "Auditory",
-    color: "#1a7a8a",
+    color: "#1F63AA",
     buyingChannel: "Auditory Reassurance",
     phrases: [
       "let's talk through it",
@@ -68,7 +68,7 @@ const CHANNELS: ChannelConfig[] = [
   {
     key: "kinesthetic",
     label: "Kinesthetic",
-    color: "#34d399",
+    color: "#FF7F00",
     buyingChannel: "Kinesthetic Experience",
     phrases: [
       "let's make this practical",
@@ -82,7 +82,7 @@ const CHANNELS: ChannelConfig[] = [
   {
     key: "auditoryDigital",
     label: "Auditory Digital",
-    color: "#a78bfa",
+    color: "#303F4B",
     buyingChannel: "Logical Justification",
     phrases: [
       "let me explain",

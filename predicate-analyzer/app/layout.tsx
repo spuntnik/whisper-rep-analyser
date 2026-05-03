@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Predicate Analyzer",
-  description: "Communication intelligence engine for predicate and buying-style analysis.",
+  title: "Whisper Rep Analyser",
+  description: "Meeting transcription, summary extraction, and representational system analysis.",
 };
 
 export default function RootLayout({

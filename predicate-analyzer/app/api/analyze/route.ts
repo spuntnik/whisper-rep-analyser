@@ -6,6 +6,6 @@ export async function POST(request: NextRequest) {
   const text = body.text ?? "";
 
   return NextResponse.json({
-    ...runAnalysisWorkflow(text),
+    ...runAnalysisWorkflow({ transcript: text, sourceLabel: "Text Input" }),
   });
 }
