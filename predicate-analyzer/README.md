@@ -15,6 +15,8 @@ Standalone Next.js MVP for meeting transcription, summary extraction, and predic
 Create a local environment file from [`./.env.local.example`](./.env.local.example) and set:
 
 - `OPENAI_API_KEY`
+- If you choose Firebase later, fill the `NEXT_PUBLIC_FIREBASE_*` and `FIREBASE_*` entries.
+- If you choose Supabase later, fill the `NEXT_PUBLIC_SUPABASE_*` and `SUPABASE_*` entries.
 
 That single key powers both:
 
@@ -22,6 +24,20 @@ That single key powers both:
 - `/api/realtime-session`
 
 For Vercel, add the same variable in the project environment settings. Keep the secret server-side only.
+
+## Data Platform Options
+
+The app is prepared for either backend path:
+
+- `firebase/` for Firestore + Storage + Auth
+- `supabase/` for Postgres + Auth + Storage + Realtime
+- `NEXT_PUBLIC_STORAGE_PROVIDER` or `STORAGE_PROVIDER` can be used later to select the active backend
+
+Recommended default for this app:
+
+- Use Firebase as the source of truth.
+- If you later need Supabase, sync from Firebase through jobs, webhooks, or an event pipeline.
+- Avoid dual-writes unless you have a specific sync pipeline and a clear ownership model.
 
 ## Notes on live mode
 
