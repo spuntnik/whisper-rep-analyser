@@ -4,8 +4,12 @@ __pycache__/
 *.egg-info
 .pytest_cache
 .ipynb_checkpoints
+predicate-analyzer/node_modules/
+predicate-analyzer/.next/
+predicate-analyzer/out/
+predicate-analyzer/.env
+predicate-analyzer/.env.*
 
 thumbs.db
 .DS_Store
 .idea
-
