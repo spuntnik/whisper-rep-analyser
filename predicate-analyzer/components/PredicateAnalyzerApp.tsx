@@ -4,16 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
-import { formatTimestamp } from "@/lib/transcript";
+import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
+import { LiveTranscriptStream } from "@/components/LiveTranscriptStream";
+import { MeetingReport } from "@/components/MeetingReport";
 import { PieChart } from "@/components/PieChart";
 
 type CaptureMode = "typed" | "upload" | "record" | "live";
-
-const LIVE_CHUNK_MS = 5000;
-
-function formatPercentage(value: number) {
-  return `${value.toFixed(1)}%`;
-}
 
 function getMimeType() {
   if (typeof MediaRecorder === "undefined") return "";
@@ -47,13 +43,11 @@ export function PredicateAnalyzerApp() {
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(false);
-  const [workflow, setWorkflow] = useState<AnalysisWorkflowResult | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const liveQueueRef = useRef(Promise.resolve());
-  const liveElapsedRef = useRef(0);
   const recordChunksRef = useRef<Blob[]>([]);
+  const realtime = useRealtimeMeeting({ model: "gpt-realtime-1.5" });
 
   useEffect(() => {
     setCanRecord(
@@ -64,56 +58,70 @@ export function PredicateAnalyzerApp() {
   }, []);
 
   useEffect(() => {
-    if (!textInput.trim()) {
-      setWorkflow(null);
-      return;
-    }
-
-    setWorkflow(
-      runAnalysisWorkflow({
-        transcript: textInput.trim(),
-        sourceLabel,
-        segments,
-      }),
-    );
-  }, [segments, sourceLabel, textInput]);
-
-  useEffect(() => {
     return () => {
-      void stopStream();
+      void stopAllCapture();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const chartData = useMemo(() => {
-    if (!workflow) {
-      return {
-        labels: ["Visual", "Auditory", "Kinesthetic", "Auditory Digital"],
-        values: [25, 25, 25, 25],
-        colors: ["#535E8D", "#1F63AA", "#FF7F00", "#303F4B"],
-      };
+  const liveTranscript = [realtime.state.transcript, realtime.state.partialTranscript]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const workflow = useMemo<AnalysisWorkflowResult | null>(() => {
+    if (captureMode === "live") {
+      if (!liveTranscript) return null;
+
+      return runAnalysisWorkflow({
+        transcript: liveTranscript,
+        sourceLabel: "Live meeting capture",
+        segments: realtime.state.segments
+          .filter((segment) => !segment.isPartial)
+          .map((segment) => ({
+            start: segment.start,
+            end: segment.end,
+            text: segment.text,
+            speaker: segment.speaker,
+          })),
+        captureMode: "live",
+      });
     }
 
-    return {
-      labels: workflow.predicateAnalysis.channels.map((channel) => channel.label),
-      values: workflow.predicateAnalysis.channels.map((channel) => channel.percentage || 0),
-      colors: workflow.predicateAnalysis.channels.map((channel) => channel.color),
-    };
-  }, [workflow]);
+    if (!textInput.trim()) return null;
+
+    return runAnalysisWorkflow({
+      transcript: textInput.trim(),
+      sourceLabel,
+      segments,
+      captureMode,
+    });
+  }, [captureMode, liveTranscript, realtime.state.segments, segments, sourceLabel, textInput]);
 
   const markdownReport = useMemo(() => {
     if (!workflow) return "";
     return buildMarkdownReport(workflow);
   }, [workflow]);
 
-  const dominant = workflow?.predicateAnalysis.dominantChannel ?? null;
-  const secondary = workflow?.predicateAnalysis.secondaryChannel ?? null;
-  const keyPoints = workflow?.meetingSummary.keyPoints ?? [];
-  const actionItems = workflow?.meetingSummary.actionItems ?? [];
+  const displayStatusMessage =
+    captureMode === "live" && statusMessage !== "Ready"
+      ? statusMessage
+      : captureMode === "live"
+        ? realtime.state.statusMessage
+        : statusMessage;
+  const liveReady = realtime.supported && !realtime.starting;
+  const recordReady = canRecord && !isBusy;
 
   async function stopStream() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     recorderRef.current = null;
+  }
+
+  async function stopAllCapture() {
+    await stopStream();
+    await realtime.stop();
+    setIsRecording(false);
   }
 
   async function transcribeBlob(blob: Blob) {
@@ -186,7 +194,12 @@ export function PredicateAnalyzerApp() {
   }
 
   async function startMicCapture(mode: Exclude<CaptureMode, "typed" | "upload">) {
-    if (!canRecord) {
+    if (mode === "live" && !realtime.supported) {
+      setErrorMessage("This browser does not support realtime live mode.");
+      return;
+    }
+
+    if (mode === "record" && !canRecord) {
       setErrorMessage("This browser does not support microphone recording.");
       return;
     }
@@ -195,8 +208,22 @@ export function PredicateAnalyzerApp() {
     setCaptureMode(mode);
     setSegments([]);
     setTextInput("");
-    setStatusMessage(mode === "live" ? "Live transcription running..." : "Recording audio...");
     setSourceLabel(mode === "live" ? "Live meeting capture" : "Recorded meeting audio");
+
+    if (mode === "live") {
+      realtime.reset();
+      setStatusMessage("Preparing realtime live mode...");
+      try {
+        await realtime.start();
+        setIsRecording(true);
+        setStatusMessage("Realtime live transcription running...");
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to start realtime live mode.");
+      }
+      return;
+    }
+
+    setStatusMessage("Recording audio...");
 
     let stream: MediaStream;
     try {
@@ -213,48 +240,19 @@ export function PredicateAnalyzerApp() {
     recorderRef.current = recorder;
     recordChunksRef.current = [];
 
-    if (mode === "live") {
-      liveElapsedRef.current = 0;
-      liveQueueRef.current = Promise.resolve();
-      recorder.ondataavailable = (event) => {
-        if (!event.data || event.data.size === 0) return;
-        const offset = liveElapsedRef.current;
-        liveElapsedRef.current += LIVE_CHUNK_MS / 1000;
-
-        liveQueueRef.current = liveQueueRef.current.then(async () => {
-          try {
-            const result = await transcribeBlob(event.data);
-            absorbTranscription(result, "live", offset);
-          } catch (error) {
-            setErrorMessage(error instanceof Error ? error.message : "Live transcription chunk failed.");
-          }
-        });
-      };
-      recorder.start(LIVE_CHUNK_MS);
-    } else {
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordChunksRef.current.push(event.data);
-        }
-      };
-      recorder.start();
-    }
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        recordChunksRef.current.push(event.data);
+      }
+    };
 
     recorder.onstop = async () => {
       try {
-        if (mode === "record") {
-          const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-          setIsBusy(true);
-          setStatusMessage("Sending recording to Whisper...");
-          const result = await transcribeBlob(blob);
-          absorbTranscription(result, "record");
-        }
-
-        if (mode === "live") {
-          setIsBusy(true);
-          setStatusMessage("Finalizing live transcript...");
-          await liveQueueRef.current;
-        }
+        setIsBusy(true);
+        setStatusMessage("Sending recording to Whisper...");
+        const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const result = await transcribeBlob(blob);
+        absorbTranscription(result, "record");
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : "Recording transcription failed.");
       } finally {
@@ -264,10 +262,17 @@ export function PredicateAnalyzerApp() {
       }
     };
 
+    recorder.start();
     setIsRecording(true);
   }
 
   async function stopMicCapture() {
+    if (captureMode === "live") {
+      await realtime.stop();
+      setIsRecording(false);
+      return;
+    }
+
     const recorder = recorderRef.current;
     if (!recorder) return;
     recorder.stop();
@@ -297,17 +302,16 @@ export function PredicateAnalyzerApp() {
     window.print();
   }
 
-  function onClearAll() {
+  async function onClearAll() {
+    await stopAllCapture();
+    realtime.reset();
     setCaptureMode("typed");
     setSourceLabel("Typed notes");
     setTextInput("");
     setSegments([]);
     setStatusMessage("Ready");
     setErrorMessage(null);
-    setWorkflow(null);
   }
-
-  const representativeStyle = workflow?.meetingSummary.speakerStyleSummary ?? "";
 
   return (
     <main className="min-h-screen bg-canvas px-4 py-6 text-white sm:px-6 lg:px-8">
@@ -330,9 +334,12 @@ export function PredicateAnalyzerApp() {
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
-                { label: "Status", value: statusMessage },
+                { label: "Status", value: displayStatusMessage },
                 { label: "Mode", value: captureMode.toUpperCase() },
-                { label: "Dominant", value: dominant?.label ?? "Pending" },
+                {
+                  label: "Dominant",
+                  value: workflow?.predicateAnalysis.dominantChannel?.label ?? "Pending",
+                },
                 { label: "Buying", value: workflow?.predicateAnalysis.buyingChannel ?? "Pending" },
               ].map((item) => (
                 <div key={item.label} className="rounded-2xl bg-[#303F4B]/35 p-4 text-[#E6DBBD]">
@@ -349,14 +356,17 @@ export function PredicateAnalyzerApp() {
             <div className="rounded-[1.75rem] border border-white/10 bg-[#E6DBBD] p-5 text-[#303F4B]">
               <div className="mb-3 flex items-center justify-between text-sm font-medium">
                 <span>Channel split</span>
-                <span>{workflow ? formatPercentage(workflow.predicateAnalysis.gap) : "0.0%"} gap</span>
+                <span>{workflow ? `${workflow.predicateAnalysis.gap.toFixed(1)}%` : "0.0%"} gap</span>
               </div>
               <div className="h-[290px]">
-                <PieChart
-                  labels={chartData.labels}
-                  values={chartData.values}
-                  colors={chartData.colors}
-                />
+                <div className="h-full">
+                  {/* The pie chart remains visible even before transcription starts. */}
+                  {workflow ? (
+                    <MeetingChart workflow={workflow} />
+                  ) : (
+                    <MeetingChart workflow={null} />
+                  )}
+                </div>
               </div>
             </div>
 
@@ -450,7 +460,10 @@ export function PredicateAnalyzerApp() {
                   <button
                     type="button"
                     onClick={() => void onToggleRecord(captureMode)}
-                    disabled={!canRecord || isBusy}
+                    disabled={
+                      (captureMode === "record" && !recordReady) ||
+                      (captureMode === "live" && !liveReady)
+                    }
                     className="rounded-full bg-[#FF7F00] px-5 py-3 text-sm font-semibold text-[#303F4B] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isRecording ? "Stop" : captureMode === "live" ? "Start Live Mode" : "Start Recording"}
@@ -466,37 +479,12 @@ export function PredicateAnalyzerApp() {
                 </div>
                 <p className="text-sm leading-6 text-[#303F4B]/75">
                   {captureMode === "live"
-                    ? "Live mode transcribes chunks as you speak. It feels live, but chunk boundaries and network latency can produce partial phrases."
+                    ? "Live mode uses a realtime audio stream and a browser WebRTC connection. It is lower-latency than chunked uploads, but depends on browser support and a stable network."
                     : "Recording mode waits until you stop, then sends the full audio file to Whisper for a cleaner transcription."}
                 </p>
+                {captureMode === "live" ? <LiveTranscriptStream state={realtime.state} /> : null}
               </div>
             ) : null}
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={onDownloadMarkdown}
-                disabled={!markdownReport}
-                className="rounded-full bg-[#1F63AA] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Export Markdown
-              </button>
-              <button
-                type="button"
-                onClick={onPrintPdf}
-                disabled={!workflow}
-                className="rounded-full border border-[#303F4B]/20 bg-white/65 px-5 py-3 text-sm font-semibold text-[#303F4B] transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Print / Save PDF
-              </button>
-              <button
-                type="button"
-                onClick={onClearAll}
-                className="rounded-full border border-[#303F4B]/20 bg-white/55 px-5 py-3 text-sm font-semibold text-[#303F4B] transition hover:bg-white/80"
-              >
-                Clear
-              </button>
-            </div>
 
             {errorMessage ? (
               <div className="rounded-2xl border border-[#FF7F00]/40 bg-[#FF7F00]/10 px-4 py-3 text-sm text-[#303F4B]">
@@ -514,159 +502,14 @@ export function PredicateAnalyzerApp() {
             </div>
           </div>
 
-          <div className="space-y-6 rounded-[2rem] border border-white/10 bg-[#303F4B] p-6 shadow-glow">
-            <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-[#E6DBBD]">Meeting Report</h2>
-              <p className="text-sm leading-6 text-white/75">
-                A presentation-style report with timeline, summary, and representational analysis.
-              </p>
-            </div>
-
-            {workflow ? (
-              <div className="space-y-5 rounded-[1.75rem] bg-[#E6DBBD] p-5 text-[#303F4B] print:bg-white">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Report</div>
-                    <h3 className="mt-2 text-2xl font-semibold">{workflow.meetingSummary.title}</h3>
-                    <div className="mt-1 text-sm text-[#303F4B]/70">{sourceLabel}</div>
-                  </div>
-                  <div className="rounded-2xl bg-[#535E8D] px-4 py-3 text-[#E6DBBD]">
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/70">
-                      Dominant channel
-                    </div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {dominant ? dominant.label : "None"}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-white/70 p-4">
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Summary</div>
-                    <div className="mt-2 text-sm leading-6">{workflow.meetingSummary.overview}</div>
-                  </div>
-                  <div className="rounded-2xl bg-white/70 p-4">
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#1F63AA]">
-                      Speaker Style
-                    </div>
-                    <div className="mt-2 text-sm leading-6">{representativeStyle}</div>
-                  </div>
-                  <div className="rounded-2xl bg-white/70 p-4">
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#FF7F00]">
-                      Buying Channel
-                    </div>
-                    <div className="mt-2 text-sm leading-6">
-                      {workflow.predicateAnalysis.buyingChannel}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-white/70 p-4">
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Key Points</div>
-                    <div className="mt-3 space-y-2">
-                      {keyPoints.length > 0 ? (
-                        keyPoints.map((point) => (
-                          <div key={`${point.start}-${point.text}`} className="rounded-xl bg-white px-3 py-2 text-sm leading-6">
-                            <span className="mr-2 rounded-full bg-[#535E8D] px-2 py-1 text-[11px] text-white">
-                              {formatTimestamp(point.start)}
-                            </span>
-                            {point.text}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-[#303F4B]/70">No key points detected yet.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-white/70 p-4">
-                    <div className="text-xs uppercase tracking-[0.24em] text-[#FF7F00]">
-                      Action Items
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {actionItems.length > 0 ? (
-                        actionItems.map((item) => (
-                          <div key={`${item.start}-${item.text}`} className="rounded-xl bg-white px-3 py-2 text-sm leading-6">
-                            <span className="mr-2 rounded-full bg-[#FF7F00] px-2 py-1 text-[11px] text-[#303F4B]">
-                              {formatTimestamp(item.start)}
-                            </span>
-                            {item.text}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-sm text-[#303F4B]/70">No explicit action items detected yet.</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-white/70 p-4">
-                  <div className="text-xs uppercase tracking-[0.24em] text-[#1F63AA]">Timeline</div>
-                  <div className="mt-3 max-h-[320px] space-y-2 overflow-auto pr-1">
-                    {workflow.segments.length > 0 ? (
-                      workflow.segments.map((segment) => (
-                        <div key={`${segment.start}-${segment.text}`} className="rounded-xl border border-[#303F4B]/10 bg-white px-3 py-2 text-sm leading-6">
-                          <span className="mr-2 rounded-full bg-[#1F63AA] px-2 py-1 text-[11px] text-white">
-                            {formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}
-                          </span>
-                          {segment.speaker ? <strong>{segment.speaker}: </strong> : null}
-                          {segment.text}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-[#303F4B]/70">
-                        Timestamped audio will appear here after Whisper transcription.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {workflow.predicateAnalysis.channels.map((channel) => (
-                    <div key={channel.key} className="rounded-2xl bg-white/70 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold">{channel.label}</span>
-                        <span className="text-sm">{channel.percentage.toFixed(1)}%</span>
-                      </div>
-                      <div className="mt-3 h-2 rounded-full bg-[#303F4B]/10">
-                        <div
-                          className="h-2 rounded-full"
-                          style={{ width: `${channel.percentage}%`, backgroundColor: channel.color }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-[#535E8D] p-4 text-[#E6DBBD]">
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/70">
-                      Secondary Channel
-                    </div>
-                    <div className="mt-2 text-lg font-semibold">
-                      {secondary ? secondary.label : "None"}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-[#1F63AA] p-4 text-white">
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/70">
-                      Confidence
-                    </div>
-                    <div className="mt-2 text-lg font-semibold">
-                      {workflow.predicateAnalysis.confidence}
-                      {workflow.predicateAnalysis.gap > 0
-                        ? ` (${formatPercentage(workflow.predicateAnalysis.gap)} gap)`
-                        : ""}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-[1.75rem] border border-white/10 bg-[#E6DBBD] p-5 text-[#303F4B]">
-                Start typing, recording, or uploading audio to generate the meeting report.
-              </div>
-            )}
-          </div>
+          <MeetingReport
+            workflow={workflow}
+            sourceLabel={sourceLabel}
+            statusMessage={displayStatusMessage}
+            onDownloadMarkdown={onDownloadMarkdown}
+            onPrintPdf={onPrintPdf}
+            onClearAll={onClearAll}
+          />
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/10 p-6 text-white shadow-glow print:hidden">
@@ -691,4 +534,18 @@ export function PredicateAnalyzerApp() {
       </div>
     </main>
   );
+}
+
+function MeetingChart({ workflow }: { workflow: AnalysisWorkflowResult | null }) {
+  const labels = workflow
+    ? workflow.predicateAnalysis.channels.map((channel) => channel.label)
+    : ["Visual", "Auditory", "Kinesthetic", "Auditory Digital"];
+  const values = workflow
+    ? workflow.predicateAnalysis.channels.map((channel) => channel.percentage || 0)
+    : [25, 25, 25, 25];
+  const colors = workflow
+    ? workflow.predicateAnalysis.channels.map((channel) => channel.color)
+    : ["#535E8D", "#1F63AA", "#FF7F00", "#303F4B"];
+
+  return <PieChart labels={labels} values={values} colors={colors} />;
 }

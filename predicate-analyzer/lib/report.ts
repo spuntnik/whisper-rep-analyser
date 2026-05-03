@@ -2,7 +2,7 @@ import type { AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import { formatTimestamp } from "@/lib/transcript";
 
 export function buildMarkdownReport(workflow: AnalysisWorkflowResult) {
-  const { meetingSummary, predicateAnalysis, transcript, sourceLabel } = workflow;
+  const { meetingSummary, predicateAnalysis, transcript, sourceLabel, captureMode } = workflow;
   const segments = workflow.segments ?? [];
 
   const segmentLines = (segments.length > 0 ? segments : []).map((segment) => {
@@ -14,6 +14,7 @@ export function buildMarkdownReport(workflow: AnalysisWorkflowResult) {
     `# ${meetingSummary.title}`,
     ``,
     `**Source:** ${sourceLabel}`,
+    `**Capture Mode:** ${captureMode}`,
     ``,
     `## Summary`,
     meetingSummary.overview,
@@ -40,10 +41,11 @@ export function buildMarkdownReport(workflow: AnalysisWorkflowResult) {
     `**Dominant:** ${predicateAnalysis.dominantChannel?.label ?? "None"}`,
     `**Secondary:** ${predicateAnalysis.secondaryChannel?.label ?? "None"}`,
     `**Buying Channel:** ${predicateAnalysis.buyingChannel}`,
+    `**Confidence:** ${predicateAnalysis.confidence}`,
+    `**Gap:** ${predicateAnalysis.gap.toFixed(1)}%`,
     ``,
     `## Transcript`,
     transcript || "No transcript available.",
     ``,
   ].join("\n");
 }
-
