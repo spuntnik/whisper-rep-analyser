@@ -56,13 +56,24 @@ npm run dev
 
 ## Deployment prep
 
-Before running a Vercel build:
+Before running a Vercel or Hostinger build:
 
-1. Copy [`./.env.local.example`](./.env.local.example) to `.env.local`.
-2. Set `OPENAI_API_KEY` locally.
-3. Add `OPENAI_API_KEY` in Vercel environment variables.
-4. Verify microphone permissions in the browser.
-5. Smoke-test upload, record, and live mode once the app is deployed.
+1. Copy [`./.env.local.example`](./.env.local.example) for local development.
+2. For Hostinger, copy [`./.env.hostinger.example`](./.env.hostinger.example) into the Hostinger environment-variable UI.
+3. Set `OPENAI_API_KEY`.
+4. Set `NEXT_PUBLIC_APP_URL=https://dealiq.mindscoach.com`.
+5. Keep Firebase as the active storage provider for now.
+6. Verify microphone permissions in the browser.
+7. Smoke-test upload, record, and live mode once the app is deployed.
+
+## Hostinger
+
+If you are deploying to Hostinger:
+
+- use the `predicate-analyzer/` folder as the app root
+- choose the Node.js Web App flow
+- use `npm run build` and `npm run start`
+- connect `dealiq.mindscoach.com` after the first successful deployment
 
 ## Flow
 

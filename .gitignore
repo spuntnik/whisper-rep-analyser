@@ -10,6 +10,7 @@ predicate-analyzer/out/
 predicate-analyzer/.env
 predicate-analyzer/.env.*
 !predicate-analyzer/.env.local.example
+!predicate-analyzer/.env.hostinger.example
 
 thumbs.db
 .DS_Store
