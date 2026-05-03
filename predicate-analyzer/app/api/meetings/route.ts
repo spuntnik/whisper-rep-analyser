@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import {
+  deleteMeetingFromFirebase,
   listMeetingsFromFirebase,
   loadMeetingFromFirebase,
   saveMeetingToFirebase,
@@ -99,5 +100,33 @@ export async function POST(request: NextRequest) {
       },
       { status },
     );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const ownerId = await getOwnerId(request);
+    const url = new URL(request.url);
+    const meetingId = url.searchParams.get("id");
+
+    if (!meetingId) {
+      return NextResponse.json({ error: "Missing meeting id." }, { status: 400 });
+    }
+
+    const result = await deleteMeetingFromFirebase(meetingId, ownerId);
+    return NextResponse.json({
+      ok: true,
+      ...result,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to delete meeting.";
+    const status = message.includes("auth")
+      ? 401
+      : message.includes("access")
+        ? 403
+        : message.includes("not found")
+          ? 404
+          : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -161,3 +161,33 @@ export async function loadMeetingFromFirebase(meetingId: string, ownerId: string
     segments,
   };
 }
+
+export async function deleteMeetingFromFirebase(meetingId: string, ownerId: string) {
+  const db = getFirebaseAdminFirestore();
+  const meetingRef = db.collection("meetings").doc(meetingId);
+  const meetingSnapshot = await meetingRef.get();
+
+  if (!meetingSnapshot.exists) {
+    throw new Error("Meeting not found.");
+  }
+
+  const meetingData = meetingSnapshot.data() as Record<string, unknown>;
+  if (String(meetingData.ownerId ?? "anonymous") !== ownerId) {
+    throw new Error("You do not have access to this meeting.");
+  }
+
+  const collectionNames = ["segments", "actionItems", "analysis"];
+  await Promise.all(
+    collectionNames.map(async (collectionName) => {
+      const snapshot = await meetingRef.collection(collectionName).get();
+      await Promise.all(snapshot.docs.map((doc) => doc.ref.delete()));
+    }),
+  );
+
+  await meetingRef.delete();
+
+  return {
+    id: meetingSnapshot.id,
+    ownerId,
+  };
+}

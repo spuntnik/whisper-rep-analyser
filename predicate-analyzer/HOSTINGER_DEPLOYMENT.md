@@ -20,15 +20,12 @@ This app is designed to be deployed as its own Node.js web app from the `predica
 
 Use [`./.env.hostinger.example`](./.env.hostinger.example) as the source for the deployment env set.
 
-Required now:
+Required now for `dealiq.mindscoach.com`:
 
-- `OPENAI_API_KEY`
 - `NEXT_PUBLIC_APP_URL=https://dealiq.mindscoach.com`
+- `OPENAI_API_KEY`
 - `NEXT_PUBLIC_STORAGE_PROVIDER=firebase`
 - `STORAGE_PROVIDER=firebase`
-
-Required later when Firebase is wired in:
-
 - `NEXT_PUBLIC_FIREBASE_API_KEY`
 - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
@@ -38,6 +35,13 @@ Required later when Firebase is wired in:
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
+
+Optional later:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DB_URL`
 
 ## Domain
 

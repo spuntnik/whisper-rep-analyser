@@ -487,6 +487,47 @@ export function PredicateAnalyzerApp() {
     }
   }
 
+  async function deleteSavedMeeting(meetingId: string) {
+    if (!firebaseToken) {
+      setMeetingsStatus("Firebase sign-in is still starting.");
+      return;
+    }
+
+    const meeting = recentMeetings.find((item) => item.id === meetingId);
+    const confirmed = window.confirm(
+      `Delete "${meeting?.title ?? "this meeting"}" from Firebase? This cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    setMeetingsStatus("Deleting meeting...");
+
+    try {
+      const response = await fetch(`/api/meetings?id=${encodeURIComponent(meetingId)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${firebaseToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Unable to delete meeting.");
+      }
+
+      if (selectedMeetingId === meetingId) {
+        await onClearAll();
+      }
+
+      setRecentMeetings((previous) => previous.filter((item) => item.id !== meetingId));
+      setMeetingsStatus(`Deleted ${meeting?.title ?? "meeting"}.`);
+      setSaveStatus(null);
+      void refreshRecentMeetings(firebaseToken);
+    } catch (error) {
+      setMeetingsStatus(error instanceof Error ? error.message : "Unable to delete meeting.");
+    }
+  }
+
   async function onClearAll() {
     await stopAllCapture();
     realtime.reset();
@@ -756,36 +797,59 @@ export function PredicateAnalyzerApp() {
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {recentMeetings.length > 0 ? (
               recentMeetings.map((meeting) => (
-                <button
+                <div
                   key={meeting.id}
-                  type="button"
-                  onClick={() => void loadSavedMeeting(meeting.id)}
                   className={`rounded-3xl border p-4 text-left transition ${
                     selectedMeetingId === meeting.id
                       ? "border-[#1F63AA] bg-white shadow-lg"
                       : "border-[#303F4B]/10 bg-white/75 hover:bg-white"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.22em] text-[#535E8D]">
-                        {meeting.captureMode}
+                  <button
+                    type="button"
+                    onClick={() => void loadSavedMeeting(meeting.id)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.22em] text-[#535E8D]">
+                          {meeting.captureMode}
+                        </div>
+                        <div className="mt-1 text-base font-semibold">{meeting.title}</div>
                       </div>
-                      <div className="mt-1 text-base font-semibold">{meeting.title}</div>
+                      <div className="rounded-full bg-[#FF7F00] px-3 py-1 text-xs font-semibold text-[#303F4B]">
+                        {meeting.confidence}
+                      </div>
                     </div>
-                    <div className="rounded-full bg-[#FF7F00] px-3 py-1 text-xs font-semibold text-[#303F4B]">
-                      {meeting.confidence}
+                    <div className="mt-3 text-sm text-[#303F4B]/70">{meeting.sourceLabel}</div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#303F4B]/65">
+                      <span>{new Date(meeting.createdAt).toLocaleString()}</span>
+                      <span>•</span>
+                      <span>{meeting.buyingChannel}</span>
+                      <span>•</span>
+                      <span>{meeting.gap.toFixed(1)}% gap</span>
                     </div>
+                  </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadSavedMeeting(meeting.id)}
+                      className="rounded-full bg-[#535E8D] px-3 py-1 text-xs font-semibold text-white transition hover:brightness-105"
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deleteSavedMeeting(meeting.id);
+                      }}
+                      className="rounded-full bg-[#FF7F00] px-3 py-1 text-xs font-semibold text-[#303F4B] transition hover:brightness-105"
+                    >
+                      Delete
+                    </button>
                   </div>
-                  <div className="mt-3 text-sm text-[#303F4B]/70">{meeting.sourceLabel}</div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#303F4B]/65">
-                    <span>{new Date(meeting.createdAt).toLocaleString()}</span>
-                    <span>•</span>
-                    <span>{meeting.buyingChannel}</span>
-                    <span>•</span>
-                    <span>{meeting.gap.toFixed(1)}% gap</span>
-                  </div>
-                </button>
+                </div>
               ))
             ) : (
               <div className="rounded-3xl border border-dashed border-[#303F4B]/15 bg-white/45 p-5 text-sm text-[#303F4B]/70">

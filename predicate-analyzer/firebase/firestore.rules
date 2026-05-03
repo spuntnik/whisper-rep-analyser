@@ -5,10 +5,48 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function meetingExists(meetingId) {
+      return exists(/databases/$(database)/documents/meetings/$(meetingId));
+    }
+
     function ownsMeeting(meetingId) {
       return signedIn()
         && get(/databases/$(database)/documents/meetings/$(meetingId)).data.ownerId
           == request.auth.uid;
+    }
+
+    function meetingKeysValid() {
+      return request.resource.data.keys().hasOnly([
+        "ownerId",
+        "title",
+        "sourceLabel",
+        "captureMode",
+        "transcript",
+        "overview",
+        "speakerStyleSummary",
+        "buyingChannel",
+        "confidence",
+        "gap",
+        "createdAt",
+        "updatedAt"
+      ]);
+    }
+
+    function meetingUpdateKeysValid() {
+      return request.resource.data.keys().hasOnly([
+        "ownerId",
+        "title",
+        "sourceLabel",
+        "captureMode",
+        "transcript",
+        "overview",
+        "speakerStyleSummary",
+        "buyingChannel",
+        "confidence",
+        "gap",
+        "createdAt",
+        "updatedAt"
+      ]) && request.resource.data.ownerId == resource.data.ownerId;
     }
 
     match /users/{userId} {
@@ -16,19 +54,26 @@ service cloud.firestore {
     }
 
     match /meetings/{meetingId} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && meetingKeysValid();
+
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && meetingUpdateKeysValid();
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
       match /segments/{segmentId} {
-        allow read, write: if ownsMeeting(meetingId);
+        allow read, create, update, delete: if ownsMeeting(meetingId);
       }
 
       match /analysis/{analysisId} {
-        allow read, write: if ownsMeeting(meetingId);
+        allow read, create, update, delete: if ownsMeeting(meetingId);
       }
 
       match /actionItems/{actionItemId} {
-        allow read, write: if ownsMeeting(meetingId);
+        allow read, create, update, delete: if ownsMeeting(meetingId);
       }
     }
   }
