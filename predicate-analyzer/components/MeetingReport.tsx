@@ -8,8 +8,10 @@ export interface MeetingReportProps {
   workflow: AnalysisWorkflowResult | null;
   sourceLabel: string;
   statusMessage: string;
+  saveStatus?: string | null;
   onDownloadMarkdown: () => void;
   onPrintPdf: () => void;
+  onSaveToFirebase?: () => void;
   onClearAll: () => void;
 }
 
@@ -21,8 +23,10 @@ export function MeetingReport({
   workflow,
   sourceLabel,
   statusMessage,
+  saveStatus,
   onDownloadMarkdown,
   onPrintPdf,
+  onSaveToFirebase,
   onClearAll,
 }: MeetingReportProps) {
   return (
@@ -211,6 +215,15 @@ export function MeetingReport({
             >
               Print / Save PDF
             </button>
+            {onSaveToFirebase ? (
+              <button
+                type="button"
+                onClick={onSaveToFirebase}
+                className="rounded-full bg-[#535E8D] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-105"
+              >
+                Save to Firebase
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onClearAll}
@@ -219,6 +232,7 @@ export function MeetingReport({
               Clear
             </button>
           </div>
+          {saveStatus ? <div className="text-sm text-[#303F4B]/70">{saveStatus}</div> : null}
         </div>
       ) : (
         <div className="rounded-[1.75rem] border border-white/10 bg-[#E6DBBD] p-5 text-[#303F4B]">

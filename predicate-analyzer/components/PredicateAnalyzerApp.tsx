@@ -5,6 +5,7 @@ import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
 import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
+import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { LiveTranscriptStream } from "@/components/LiveTranscriptStream";
 import { MeetingReport } from "@/components/MeetingReport";
 import { PieChart } from "@/components/PieChart";
@@ -42,12 +43,14 @@ export function PredicateAnalyzerApp() {
   const [isRecording, setIsRecording] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
   const realtime = useRealtimeMeeting({ model: "gpt-realtime-1.5" });
+  const firebaseReady = useMemo(() => Boolean(getFirebaseClientServices()), []);
 
   useEffect(() => {
     setCanRecord(
@@ -302,6 +305,39 @@ export function PredicateAnalyzerApp() {
     window.print();
   }
 
+  async function saveCurrentWorkflow() {
+    if (!workflow) {
+      setSaveStatus("Nothing to save yet.");
+      return;
+    }
+
+    setSaveStatus("Saving to Firebase...");
+
+    try {
+      const response = await fetch("/api/meetings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          workflow,
+          sourceLabel,
+          captureMode,
+        }),
+      });
+
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Unable to save meeting to Firebase.");
+      }
+
+      const data = (await response.json()) as { id?: string };
+      setSaveStatus(data.id ? `Saved to Firebase as ${data.id}.` : "Saved to Firebase.");
+    } catch (error) {
+      setSaveStatus(error instanceof Error ? error.message : "Unable to save meeting to Firebase.");
+    }
+  }
+
   async function onClearAll() {
     await stopAllCapture();
     realtime.reset();
@@ -311,6 +347,7 @@ export function PredicateAnalyzerApp() {
     setSegments([]);
     setStatusMessage("Ready");
     setErrorMessage(null);
+    setSaveStatus(null);
   }
 
   return (
@@ -506,8 +543,10 @@ export function PredicateAnalyzerApp() {
             workflow={workflow}
             sourceLabel={sourceLabel}
             statusMessage={displayStatusMessage}
+            saveStatus={saveStatus}
             onDownloadMarkdown={onDownloadMarkdown}
             onPrintPdf={onPrintPdf}
+            onSaveToFirebase={workflow ? () => void saveCurrentWorkflow() : undefined}
             onClearAll={onClearAll}
           />
         </section>
@@ -527,6 +566,9 @@ export function PredicateAnalyzerApp() {
               </div>
               <div className="rounded-full bg-[#E6DBBD] px-4 py-2 text-sm font-semibold text-[#303F4B]">
                 {workflow ? "Report ready" : "Waiting for transcript"}
+              </div>
+              <div className="rounded-full bg-[#1F63AA] px-4 py-2 text-sm font-semibold text-white">
+                {firebaseReady ? "Firebase ready" : "Firebase pending"}
               </div>
             </div>
           </div>
