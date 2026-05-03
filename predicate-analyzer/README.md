@@ -12,13 +12,23 @@ Standalone Next.js MVP for meeting transcription, summary extraction, and predic
 
 ## Environment
 
-Set `OPENAI_API_KEY` before running the app.
+Create a local environment file from [`./.env.local.example`](./.env.local.example) and set:
+
+- `OPENAI_API_KEY`
+
+That single key powers both:
+
+- `/api/transcribe`
+- `/api/realtime-session`
+
+For Vercel, add the same variable in the project environment settings. Keep the secret server-side only.
 
 ## Notes on live mode
 
-- Live mode is chunked, not true sub-second streaming
-- Very long meetings can accumulate latency if transcription takes longer than the chunk interval
+- Live mode is realtime WebRTC-based
 - Microphone capture requires a secure context
+- The browser must support `RTCPeerConnection` and microphone permissions
+- If the realtime route fails, the upload/record flow is still available as the fallback path
 - Speaker diarization is best-effort and may fall back to standard transcription if the diarization model is unavailable
 
 ## Run
@@ -27,6 +37,16 @@ Set `OPENAI_API_KEY` before running the app.
 npm install
 npm run dev
 ```
+
+## Deployment prep
+
+Before running a Vercel build:
+
+1. Copy [`./.env.local.example`](./.env.local.example) to `.env.local`.
+2. Set `OPENAI_API_KEY` locally.
+3. Add `OPENAI_API_KEY` in Vercel environment variables.
+4. Verify microphone permissions in the browser.
+5. Smoke-test upload, record, and live mode once the app is deployed.
 
 ## Flow
 

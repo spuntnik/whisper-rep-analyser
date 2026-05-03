@@ -9,6 +9,7 @@ predicate-analyzer/.next/
 predicate-analyzer/out/
 predicate-analyzer/.env
 predicate-analyzer/.env.*
+!predicate-analyzer/.env.local.example
 
 thumbs.db
 .DS_Store
