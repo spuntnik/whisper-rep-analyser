@@ -141,17 +141,7 @@ export function buildRealtimeSessionPayload(input: {
   }
 
   if (family === "transcription") {
-    return {
-      model,
-      instructions:
-        input.instructions ??
-        [
-          "You are a live transcription engine.",
-          "Transcribe the speaker accurately and emit concise transcript updates.",
-          "Preserve action-item language and speaker boundaries for downstream analysis.",
-        ].join(" "),
-      language: input.language ?? "en",
-    };
+    return { model };
   }
 
   return {
