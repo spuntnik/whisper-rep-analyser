@@ -16,6 +16,10 @@ This app is designed to be deployed as its own Node.js web app from the `predica
 - Build command: `npm run build`
 - Start command: `npm run start`
 
+If Hostinger asks for a direct process command, use:
+
+- `node .next/standalone/server.js`
+
 ## Environment variables
 
 Use [`./.env.hostinger.example`](./.env.hostinger.example) as the source for the deployment env set.
