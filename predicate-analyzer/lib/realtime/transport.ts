@@ -2,6 +2,7 @@ import type {
   RealtimeSessionResponse,
   RealtimeTransportEvent,
 } from "@/lib/realtime/types";
+import { summarizeRealtimeFailure } from "@/lib/realtime/errors";
 
 export interface RealtimeTransportCallbacks {
   onEvent: (event: RealtimeTransportEvent) => void;
@@ -165,8 +166,11 @@ export async function connectRealtimeTransport(
   });
 
   if (!response.ok) {
-    const details = await response.text();
-    throw new Error(details || "Unable to establish realtime connection.");
+    const details = await summarizeRealtimeFailure(
+      response,
+      "Unable to establish realtime connection.",
+    );
+    throw new Error(details);
   }
 
   const answerSdp = await response.text();

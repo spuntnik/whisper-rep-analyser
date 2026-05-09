@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { connectRealtimeTransport } from "@/lib/realtime/transport";
+import { summarizeRealtimeFailure } from "@/lib/realtime/errors";
 import { normalizeRealtimeModel } from "@/lib/realtime/models";
 import { applyRealtimeTranscriptEvent, createInitialTranscriptState } from "@/lib/transcript-reducer";
 import type {
@@ -62,8 +63,11 @@ export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
     });
 
     if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || "Failed to create realtime session.");
+      const message = await summarizeRealtimeFailure(
+        response,
+        "Failed to create realtime session.",
+      );
+      throw new Error(message);
     }
 
     return (await response.json()) as RealtimeSessionResponse;
@@ -150,6 +154,8 @@ export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to start realtime meeting.";
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setState((previous) => ({
         ...previous,
         connectionState: "error",
