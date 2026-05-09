@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   buildRealtimeSessionPayload,
   getRealtimeConnectionEndpoint,
+  getRealtimeSessionCreationEndpoint,
   normalizeRealtimeModel,
 } from "@/lib/realtime/models";
 
 export const runtime = "nodejs";
-
-const REALTIME_SESSION_ENDPOINT = "https://api.openai.com/v1/realtime/sessions";
 
 type RealtimeSessionRequestBody = {
   model?: string;
@@ -31,10 +30,10 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => ({}))) as RealtimeSessionRequestBody;
   const payload = buildPayload(body);
-  const connectionEndpoint = getRealtimeConnectionEndpoint(
-    normalizeRealtimeModel(body.model),
-  );
-  const response = await fetch(REALTIME_SESSION_ENDPOINT, {
+  const model = normalizeRealtimeModel(body.model);
+  const creationEndpoint = getRealtimeSessionCreationEndpoint(model);
+  const connectionEndpoint = getRealtimeConnectionEndpoint(model);
+  const response = await fetch(creationEndpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -58,6 +57,7 @@ export async function POST(request: NextRequest) {
     const session = JSON.parse(text) as Record<string, unknown>;
     return NextResponse.json({
       ...session,
+      creation_endpoint: creationEndpoint,
       connection_endpoint: connectionEndpoint,
     });
   } catch {
