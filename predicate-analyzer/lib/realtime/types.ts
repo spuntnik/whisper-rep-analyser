@@ -14,6 +14,7 @@ export interface RealtimeSessionConfig {
 
 export interface RealtimeSessionResponse {
   model: string;
+  connection_endpoint?: string;
   instructions?: string;
   client_secret: {
     value: string;

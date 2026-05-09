@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeRealtimeModel } from "@/lib/realtime/models";
+import {
+  buildRealtimeSessionPayload,
+  getRealtimeConnectionEndpoint,
+  normalizeRealtimeModel,
+} from "@/lib/realtime/models";
 
 export const runtime = "nodejs";
 
@@ -12,30 +16,11 @@ type RealtimeSessionRequestBody = {
 };
 
 function buildPayload(body: RealtimeSessionRequestBody) {
-  const model = normalizeRealtimeModel(body.model);
-
-  return {
-    model,
-    modalities: ["text"],
-    input_audio_transcription: {
-      model: "gpt-4o-mini-transcribe",
-      language: body.language ?? "en",
-    },
-    turn_detection: {
-      type: "server_vad",
-      prefix_padding_ms: 300,
-      silence_duration_ms: 700,
-      threshold: 0.55,
-    },
-    instructions:
-      body.instructions ??
-      [
-        "You are a live meeting transcription engine.",
-        "Transcribe the speaker accurately and emit concise transcript updates.",
-        "Do not answer questions unless explicitly asked to summarize.",
-        "Preserve action-item and intent language for downstream meeting analysis.",
-      ].join(" "),
-  };
+  return buildRealtimeSessionPayload({
+    model: normalizeRealtimeModel(body.model),
+    language: body.language,
+    instructions: body.instructions,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -45,13 +30,17 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => ({}))) as RealtimeSessionRequestBody;
+  const payload = buildPayload(body);
+  const connectionEndpoint = getRealtimeConnectionEndpoint(
+    normalizeRealtimeModel(body.model),
+  );
   const response = await fetch(REALTIME_SESSION_ENDPOINT, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildPayload(body)),
+    body: JSON.stringify(payload),
   });
 
   const text = await response.text();
@@ -66,7 +55,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(JSON.parse(text));
+    const session = JSON.parse(text) as Record<string, unknown>;
+    return NextResponse.json({
+      ...session,
+      connection_endpoint: connectionEndpoint,
+    });
   } catch {
     return NextResponse.json(
       {

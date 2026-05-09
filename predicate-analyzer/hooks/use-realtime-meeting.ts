@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { connectRealtimeTransport } from "@/lib/realtime/transport";
 import { summarizeRealtimeFailure } from "@/lib/realtime/errors";
-import { normalizeRealtimeModel } from "@/lib/realtime/models";
+import {
+  getRealtimeSessionFamily,
+  normalizeRealtimeModel,
+} from "@/lib/realtime/models";
 import { applyRealtimeTranscriptEvent, createInitialTranscriptState } from "@/lib/transcript-reducer";
 import type {
   RealtimeSessionResponse,
@@ -16,7 +19,25 @@ export interface UseRealtimeMeetingOptions {
   language?: string;
 }
 
-function buildInstructions() {
+function buildInstructionsForModel(model: string) {
+  const family = getRealtimeSessionFamily(normalizeRealtimeModel(model));
+
+  if (family === "translation") {
+    return [
+      "You are a live speech translation engine.",
+      "Translate the speaker into clear English while preserving intent, names, and action items.",
+      "Emit concise transcript updates so downstream meeting analysis can summarize the call.",
+    ].join(" ");
+  }
+
+  if (family === "transcription") {
+    return [
+      "You are a live transcription engine.",
+      "Transcribe the speaker accurately and emit concise transcript updates.",
+      "Preserve action-item language and speaker boundaries for downstream analysis.",
+    ].join(" ");
+  }
+
   return [
     "You are a live meeting transcription engine.",
     "Transcribe the speaker accurately and emit concise final transcript segments.",
@@ -58,7 +79,7 @@ export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
       body: JSON.stringify({
         model,
         language: options.language ?? "en",
-        instructions: buildInstructions(),
+        instructions: buildInstructionsForModel(model),
       }),
     });
 

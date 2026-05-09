@@ -5,7 +5,14 @@ import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
 import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
-import { DEFAULT_REALTIME_MODEL } from "@/lib/realtime/models";
+import {
+  DEFAULT_REALTIME_MODEL,
+  DEFAULT_TRANSCRIPTION_MODEL,
+  REALTIME_MODEL_OPTIONS,
+  TRANSCRIPTION_MODEL_OPTIONS,
+  type RealtimeModel,
+  type TranscriptionModel,
+} from "@/lib/realtime/models";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
 import type { FirebaseMeetingSummary } from "@/lib/firebase/meetings";
@@ -54,13 +61,23 @@ export function PredicateAnalyzerApp() {
   const [meetingsStatus, setMeetingsStatus] = useState<string | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [canRecord, setCanRecord] = useState(false);
+  const [realtimeModel, setRealtimeModel] = useState<RealtimeModel>(DEFAULT_REALTIME_MODEL);
+  const [transcriptionModel, setTranscriptionModel] = useState<TranscriptionModel>(
+    DEFAULT_TRANSCRIPTION_MODEL,
+  );
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
-  const realtime = useRealtimeMeeting({ model: DEFAULT_REALTIME_MODEL });
+  const realtime = useRealtimeMeeting({ model: realtimeModel });
   const firebaseServices = useMemo(() => getFirebaseClientServices(), []);
   const firebaseReady = Boolean(firebaseServices);
+  const selectedRealtimeModel =
+    REALTIME_MODEL_OPTIONS.find((item) => item.value === realtimeModel) ??
+    REALTIME_MODEL_OPTIONS[0];
+  const selectedTranscriptionModel =
+    TRANSCRIPTION_MODEL_OPTIONS.find((item) => item.value === transcriptionModel) ??
+    TRANSCRIPTION_MODEL_OPTIONS[0];
 
   useEffect(() => {
     setCanRecord(
@@ -198,6 +215,7 @@ export function PredicateAnalyzerApp() {
     formData.append("file", file);
     formData.append("diarize", speakerDiarization ? "true" : "false");
     formData.append("responseFormat", "verbose_json");
+    formData.append("model", transcriptionModel);
 
     const response = await fetch("/api/transcribe", {
       method: "POST",
@@ -249,7 +267,7 @@ export function PredicateAnalyzerApp() {
     setSourceLabel(toTitleCase(file.name));
     setErrorMessage(null);
     setIsBusy(true);
-    setStatusMessage("Uploading audio for Whisper transcription...");
+    setStatusMessage(`Uploading audio for ${selectedTranscriptionModel.label} transcription...`);
 
     try {
       const result = await transcribeBlob(file);
@@ -291,7 +309,7 @@ export function PredicateAnalyzerApp() {
       return;
     }
 
-    setStatusMessage("Recording audio...");
+    setStatusMessage(`Recording audio for ${selectedTranscriptionModel.label}...`);
 
     let stream: MediaStream;
     try {
@@ -317,7 +335,7 @@ export function PredicateAnalyzerApp() {
     recorder.onstop = async () => {
       try {
         setIsBusy(true);
-        setStatusMessage("Sending recording to Whisper...");
+        setStatusMessage(`Sending recording to ${selectedTranscriptionModel.label}...`);
         const blob = new Blob(recordChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         const result = await transcribeBlob(blob);
         absorbTranscription(result, "record");
@@ -549,16 +567,16 @@ export function PredicateAnalyzerApp() {
         <section className="grid overflow-hidden rounded-[2rem] border border-white/10 bg-[#535E8D] shadow-glow print:hidden lg:grid-cols-[1.25fr_0.75fr]">
           <div className="space-y-5 p-6 sm:p-8 lg:p-10">
             <div className="inline-flex rounded-full border border-[#E6DBBD]/20 bg-[#303F4B]/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-[#E6DBBD]">
-              Whisper + Rep Analyser
+              Dealiq Meeting Intelligence
             </div>
             <div className="space-y-3">
               <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-[#E6DBBD] sm:text-5xl">
                 Meeting intelligence that transcribes, summarizes, and maps communication style.
               </h1>
               <p className="max-w-3xl text-base leading-7 text-white/85 sm:text-lg">
-                Upload audio, record a meeting, or switch to live capture. Whisper handles the
-                transcript, then the report engine extracts notes, timestamps, key points, action
-                items, and the internal representational system map.
+                Upload audio, record a meeting, or switch to live capture. The selected model
+                handles the transcript, then the report engine extracts notes, timestamps, key
+                points, action items, and the internal representational system map.
               </p>
             </div>
 
@@ -622,8 +640,8 @@ export function PredicateAnalyzerApp() {
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold">Input</h2>
               <p className="text-sm leading-6 text-[#303F4B]/75">
-                Paste notes, upload audio, or capture a live meeting. Whisper transcription is the
-                source of truth; the rep map and summary are built from the same transcript.
+                Paste notes, upload audio, or capture a live meeting. Transcription is the source
+                of truth; the rep map and summary are built from the same transcript.
               </p>
             </div>
 
@@ -648,6 +666,48 @@ export function PredicateAnalyzerApp() {
                   {item.label}
                 </button>
               ))}
+            </div>
+
+            <div className="grid gap-3 rounded-3xl border border-[#303F4B]/10 bg-white/35 p-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.22em] text-[#303F4B]/60">
+                  Live model
+                </div>
+                <select
+                  value={realtimeModel}
+                  onChange={(event) => setRealtimeModel(event.target.value as RealtimeModel)}
+                  disabled={isRecording || isBusy}
+                  className="w-full rounded-2xl border border-[#303F4B]/15 bg-white/80 px-4 py-3 text-sm text-[#303F4B] outline-none transition focus:border-[#1F63AA] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {REALTIME_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs leading-5 text-[#303F4B]/65">{selectedRealtimeModel.description}</p>
+              </label>
+
+              <label className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.22em] text-[#303F4B]/60">
+                  Upload / record model
+                </div>
+                <select
+                  value={transcriptionModel}
+                  onChange={(event) => setTranscriptionModel(event.target.value as TranscriptionModel)}
+                  disabled={isRecording || isBusy}
+                  className="w-full rounded-2xl border border-[#303F4B]/15 bg-white/80 px-4 py-3 text-sm text-[#303F4B] outline-none transition focus:border-[#1F63AA] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {TRANSCRIPTION_MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs leading-5 text-[#303F4B]/65">
+                  {selectedTranscriptionModel.description}
+                </p>
+              </label>
             </div>
 
             {captureMode === "upload" ? (
@@ -710,7 +770,7 @@ export function PredicateAnalyzerApp() {
                 <p className="text-sm leading-6 text-[#303F4B]/75">
                   {captureMode === "live"
                     ? "Live mode uses a realtime audio stream and a browser WebRTC connection. It is lower-latency than chunked uploads, but depends on browser support and a stable network."
-                    : "Recording mode waits until you stop, then sends the full audio file to Whisper for a cleaner transcription."}
+                    : "Recording mode waits until you stop, then sends the full audio file to the selected transcription model for a cleaner transcript."}
                 </p>
                 {captureMode === "live" ? <LiveTranscriptStream state={realtime.state} /> : null}
               </div>

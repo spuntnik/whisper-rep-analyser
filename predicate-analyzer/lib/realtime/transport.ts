@@ -20,7 +20,7 @@ export interface RealtimeTransportStartOptions {
   callbacks: RealtimeTransportCallbacks;
 }
 
-const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime";
+const DEFAULT_OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime";
 
 function parseEvent(data: unknown): RealtimeTransportEvent {
   if (typeof data !== "object" || data === null) {
@@ -156,7 +156,8 @@ export async function connectRealtimeTransport(
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
-  const response = await fetch(`${OPENAI_REALTIME_URL}?model=${encodeURIComponent(model)}`, {
+  const realtimeUrl = session.connection_endpoint ?? DEFAULT_OPENAI_REALTIME_URL;
+  const response = await fetch(`${realtimeUrl}?model=${encodeURIComponent(model)}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${session.client_secret.value}`,

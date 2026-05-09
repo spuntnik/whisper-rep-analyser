@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
+import {
+  DEFAULT_TRANSCRIPTION_MODEL,
+  normalizeTranscriptionModel,
+} from "@/lib/realtime/models";
 
 export const runtime = "nodejs";
 
@@ -31,8 +35,13 @@ function normalizeSegments(segments: OpenAiTranscriptionSegment[] | undefined) {
     .filter((segment) => segment.text.length > 0);
 }
 
-function chooseModel(useDiarization: boolean) {
-  return useDiarization ? "gpt-4o-transcribe-diarize" : "whisper-1";
+function chooseModel(requestedModel: string | null, useDiarization: boolean) {
+  const normalized = normalizeTranscriptionModel(requestedModel);
+  if (useDiarization) {
+    return "gpt-4o-transcribe-diarize";
+  }
+
+  return normalized;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +53,9 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file");
   const useDiarization = formData.get("diarize") === "true";
-  const model = chooseModel(useDiarization);
+  const requestedModelValue = formData.get("model");
+  const requestedModel = typeof requestedModelValue === "string" ? requestedModelValue : null;
+  const model = chooseModel(requestedModel, useDiarization);
   const responseFormat = formData.get("responseFormat") === "text" ? "text" : "verbose_json";
 
   if (!(file instanceof File)) {
@@ -75,9 +86,9 @@ export async function POST(request: NextRequest) {
   let warning: string | undefined;
   let response = await submit(model);
   if (!response.ok && useDiarization) {
-    usedModel = "whisper-1";
-    warning = "Speaker diarization fell back to whisper-1.";
-    response = await submit("whisper-1");
+    usedModel = DEFAULT_TRANSCRIPTION_MODEL;
+    warning = "Speaker diarization fell back to GPT-4o mini Transcribe.";
+    response = await submit(DEFAULT_TRANSCRIPTION_MODEL);
   }
 
   if (!response.ok) {
