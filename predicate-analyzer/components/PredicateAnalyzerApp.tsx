@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
@@ -20,7 +21,18 @@ import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth"
 import type { FirebaseMeetingSummary } from "@/lib/firebase/meetings";
 import { LiveTranscriptStream } from "@/components/LiveTranscriptStream";
 import { MeetingReport } from "@/components/MeetingReport";
-import { PieChart } from "@/components/PieChart";
+
+const PieChart = dynamic(
+  () => import("@/components/PieChart").then((module) => module.PieChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[#303F4B]/20 bg-white/55 text-sm text-[#303F4B]/65">
+        Loading chart...
+      </div>
+    ),
+  },
+);
 
 type CaptureMode = "typed" | "upload" | "record" | "live";
 

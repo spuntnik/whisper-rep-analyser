@@ -1,8 +1,20 @@
 "use client";
 
-import { PieChart } from "@/components/PieChart";
+import dynamic from "next/dynamic";
 import { formatTimestamp } from "@/lib/transcript";
 import type { AnalysisWorkflowResult } from "@/lib/analyze-workflow";
+
+const LazyPieChart = dynamic(
+  () => import("@/components/PieChart").then((module) => module.PieChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[#303F4B]/20 bg-white/55 text-sm text-[#303F4B]/65">
+        Loading chart...
+      </div>
+    ),
+  },
+);
 
 export interface MeetingReportProps {
   workflow: AnalysisWorkflowResult | null;
@@ -150,7 +162,7 @@ export function MeetingReport({
                   <span>{workflow.predicateAnalysis.gap.toFixed(1)}% gap</span>
                 </div>
                 <div className="h-[290px]">
-                  <PieChart
+                  <LazyPieChart
                     labels={workflow.predicateAnalysis.channels.map((channel) => channel.label)}
                     values={workflow.predicateAnalysis.channels.map((channel) => channel.percentage)}
                     colors={workflow.predicateAnalysis.channels.map((channel) => channel.color)}
