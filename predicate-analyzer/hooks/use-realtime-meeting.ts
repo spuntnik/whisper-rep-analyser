@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { connectRealtimeTransport } from "@/lib/realtime/transport";
+import { normalizeRealtimeModel } from "@/lib/realtime/models";
 import { applyRealtimeTranscriptEvent, createInitialTranscriptState } from "@/lib/transcript-reducer";
 import type {
   RealtimeSessionResponse,
@@ -24,7 +25,7 @@ function buildInstructions() {
 }
 
 export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
-  const model = options.model ?? "gpt-realtime";
+  const model = normalizeRealtimeModel(options.model);
   const [state, setState] = useState<RealtimeTranscriptState>(createInitialTranscriptState());
   const connectionRef = useRef<{ close: () => void; sendText: (text: string) => void } | null>(
     null,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeRealtimeModel } from "@/lib/realtime/models";
 
 export const runtime = "nodejs";
 
@@ -11,8 +12,10 @@ type RealtimeSessionRequestBody = {
 };
 
 function buildPayload(body: RealtimeSessionRequestBody) {
+  const model = normalizeRealtimeModel(body.model);
+
   return {
-    model: body.model ?? "gpt-realtime",
+    model,
     modalities: ["text"],
     input_audio_transcription: {
       model: "gpt-4o-mini-transcribe",

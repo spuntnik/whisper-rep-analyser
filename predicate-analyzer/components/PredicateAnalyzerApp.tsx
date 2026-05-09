@@ -5,6 +5,7 @@ import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
 import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
+import { DEFAULT_REALTIME_MODEL } from "@/lib/realtime/models";
 import { getFirebaseClientServices } from "@/lib/firebase/client";
 import { onAuthStateChanged, signInAnonymously, type User } from "firebase/auth";
 import type { FirebaseMeetingSummary } from "@/lib/firebase/meetings";
@@ -57,7 +58,7 @@ export function PredicateAnalyzerApp() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
-  const realtime = useRealtimeMeeting({ model: "gpt-realtime" });
+  const realtime = useRealtimeMeeting({ model: DEFAULT_REALTIME_MODEL });
   const firebaseServices = useMemo(() => getFirebaseClientServices(), []);
   const firebaseReady = Boolean(firebaseServices);
 
