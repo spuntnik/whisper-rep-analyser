@@ -11,6 +11,7 @@ export interface FirebaseServiceAccountConfig {
   projectId: string;
   clientEmail: string;
   privateKey: string;
+  storageBucket?: string;
 }
 
 export function getFirebaseWebConfig(): FirebaseWebConfig | null {
@@ -35,15 +36,20 @@ export function getFirebaseWebConfig(): FirebaseWebConfig | null {
 export function getFirebaseServiceAccountConfig(): FirebaseServiceAccountConfig | null {
   const projectId = process.env.FIREBASE_PROJECT_ID ?? "";
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL ?? "";
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "";
 
   if (!projectId || !clientEmail || !privateKey) {
     return null;
   }
 
+  // Handle potential surrounding quotes and escaped newlines
+  privateKey = privateKey.replace(/^['"]|['"]$/g, "").replace(/\\n/g, "\n");
+
   return {
     projectId,
     clientEmail,
-    privateKey: privateKey.replace(/\\n/g, "\n"),
+    privateKey,
+    storageBucket: storageBucket || undefined,
   };
 }
