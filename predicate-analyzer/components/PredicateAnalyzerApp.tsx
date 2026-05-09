@@ -53,6 +53,12 @@ function toTitleCase(name: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatDisplayDate(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
 function mergeSegments(existing: TranscriptSegment[], incoming: TranscriptSegment[]) {
   return [...existing, ...incoming].sort((left, right) => left.start - right.start);
 }
@@ -84,7 +90,8 @@ export function PredicateAnalyzerApp() {
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
   const realtime = useRealtimeMeeting({ model: realtimeModel });
-  const firebaseServices = useMemo(() => getFirebaseClientServices(), []);
+  const [firebaseServices, setFirebaseServices] =
+    useState<ReturnType<typeof getFirebaseClientServices> | null>(null);
   const firebaseReady = Boolean(firebaseServices);
   const selectedRealtimeModel =
     REALTIME_MODEL_OPTIONS.find((item) => item.value === realtimeModel) ??
@@ -101,6 +108,10 @@ export function PredicateAnalyzerApp() {
         Boolean(navigator.mediaDevices?.getUserMedia) &&
         typeof MediaRecorder !== "undefined",
     );
+  }, []);
+
+  useEffect(() => {
+    setFirebaseServices(getFirebaseClientServices());
   }, []);
 
   useEffect(() => {
@@ -921,7 +932,7 @@ export function PredicateAnalyzerApp() {
                     </div>
                     <div className="mt-3 text-sm text-[#303F4B]/70">{meeting.sourceLabel}</div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#303F4B]/65">
-                      <span>{new Date(meeting.createdAt).toLocaleString()}</span>
+                      <span>{formatDisplayDate(meeting.createdAt)}</span>
                       <span>•</span>
                       <span>{meeting.buyingChannel}</span>
                       <span>•</span>
