@@ -79,6 +79,11 @@ const REALTIME_TRANSCRIPTION_ENDPOINT = "https://api.openai.com/v1/realtime/tran
 
 export type RealtimeSessionFamily = "realtime" | "translation" | "transcription";
 
+export interface RealtimeModelBadge {
+  label: string;
+  tone: "blue" | "violet" | "orange" | "slate";
+}
+
 export function normalizeRealtimeModel(model?: string | null): RealtimeModel {
   if (model && (REALTIME_MODEL_VALUES as readonly string[]).includes(model)) {
     return model as RealtimeModel;
@@ -107,7 +112,79 @@ export function getRealtimeSessionFamily(model: RealtimeModel): RealtimeSessionF
   return "realtime";
 }
 
+export function getRealtimeModelBadge(model?: string | null): RealtimeModelBadge {
+  const normalized = normalizeRealtimeModel(model);
+
+  if (normalized === "gpt-realtime-translate") {
+    return {
+      label: "Translation",
+      tone: "violet",
+    };
+  }
+
+  if (normalized === "gpt-realtime-whisper") {
+    return {
+      label: "GA Realtime Whisper",
+      tone: "blue",
+    };
+  }
+
+  if (normalized === "gpt-realtime-mini") {
+    return {
+      label: "GA Realtime Mini",
+      tone: "slate",
+    };
+  }
+
+  if (normalized === "gpt-realtime-2") {
+    return {
+      label: "GA Realtime 2",
+      tone: "violet",
+    };
+  }
+
+  return {
+    label: "GA Realtime",
+    tone: "orange",
+  };
+}
+
+export function getTranscriptionModelBadge(model?: string | null): RealtimeModelBadge {
+  const normalized = normalizeTranscriptionModel(model);
+
+  if (normalized === "gpt-4o-transcribe") {
+    return {
+      label: "Upload: GPT-4o Transcribe",
+      tone: "violet",
+    };
+  }
+
+  if (normalized === "whisper-1") {
+    return {
+      label: "Upload: Whisper",
+      tone: "slate",
+    };
+  }
+
+  return {
+    label: "Upload: GPT-4o Mini Transcribe",
+    tone: "blue",
+  };
+}
+
 export function getRealtimeConnectionEndpoint(model: RealtimeModel) {
+  switch (getRealtimeSessionFamily(model)) {
+    case "translation":
+      return REALTIME_TRANSLATION_ENDPOINT;
+    case "transcription":
+      return REALTIME_TRANSCRIPTION_ENDPOINT;
+    case "realtime":
+    default:
+      return REALTIME_SESSION_ENDPOINT;
+  }
+}
+
+export function getRealtimeSessionCreationEndpoint(model: RealtimeModel) {
   switch (getRealtimeSessionFamily(model)) {
     case "translation":
       return REALTIME_TRANSLATION_ENDPOINT;

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatTimestamp } from "@/lib/transcript";
+import { getRealtimeModelBadge } from "@/lib/realtime/models";
 import type { RealtimeTranscriptState } from "@/lib/realtime/types";
 
 export interface LiveTranscriptStreamProps {
@@ -23,8 +24,23 @@ function connectionTone(state: RealtimeTranscriptState["connectionState"]) {
   }
 }
 
+function modelToneClass(tone: "blue" | "violet" | "orange" | "slate") {
+  switch (tone) {
+    case "violet":
+      return "bg-[#535E8D] text-white";
+    case "orange":
+      return "bg-[#FF7F00] text-[#303F4B]";
+    case "slate":
+      return "bg-[#303F4B] text-white";
+    case "blue":
+    default:
+      return "bg-[#1F63AA] text-white";
+  }
+}
+
 export function LiveTranscriptStream({ state }: LiveTranscriptStreamProps) {
   const displayText = [state.transcript, state.partialTranscript].filter(Boolean).join(" ").trim();
+  const modelBadge = getRealtimeModelBadge(state.model);
 
   return (
     <section className="rounded-[1.75rem] border border-[#303F4B]/15 bg-white/55 p-4 text-[#303F4B]">
@@ -33,9 +49,18 @@ export function LiveTranscriptStream({ state }: LiveTranscriptStreamProps) {
           <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Live stream</div>
           <div className="mt-1 text-sm font-semibold">{state.statusMessage}</div>
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-[#303F4B] px-3 py-2 text-xs font-semibold text-white">
-          <span className={`h-2.5 w-2.5 rounded-full ${connectionTone(state.connectionState)}`} />
-          {state.connectionState}
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${modelToneClass(
+              modelBadge.tone,
+            )}`}
+          >
+            {modelBadge.label}
+          </div>
+          <div className="flex items-center gap-2 rounded-full bg-[#303F4B] px-3 py-2 text-xs font-semibold text-white">
+            <span className={`h-2.5 w-2.5 rounded-full ${connectionTone(state.connectionState)}`} />
+            {state.connectionState}
+          </div>
         </div>
       </div>
 

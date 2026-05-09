@@ -10,6 +10,8 @@ import {
   DEFAULT_TRANSCRIPTION_MODEL,
   REALTIME_MODEL_OPTIONS,
   TRANSCRIPTION_MODEL_OPTIONS,
+  getRealtimeModelBadge,
+  getTranscriptionModelBadge,
   type RealtimeModel,
   type TranscriptionModel,
 } from "@/lib/realtime/models";
@@ -78,6 +80,8 @@ export function PredicateAnalyzerApp() {
   const selectedTranscriptionModel =
     TRANSCRIPTION_MODEL_OPTIONS.find((item) => item.value === transcriptionModel) ??
     TRANSCRIPTION_MODEL_OPTIONS[0];
+  const activeLiveBadge = getRealtimeModelBadge(realtime.state.model ?? realtimeModel);
+  const activeUploadBadge = getTranscriptionModelBadge(transcriptionModel);
 
   useEffect(() => {
     setCanRecord(
@@ -666,6 +670,27 @@ export function PredicateAnalyzerApp() {
                   {item.label}
                 </button>
               ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <div
+                className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  captureMode === "live"
+                    ? "bg-[#1F63AA] text-white"
+                    : "bg-white/70 text-[#303F4B]"
+                }`}
+              >
+                Live: {activeLiveBadge.label}
+              </div>
+              <div
+                className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  captureMode === "upload" || captureMode === "record"
+                    ? "bg-[#535E8D] text-white"
+                    : "bg-white/70 text-[#303F4B]"
+                }`}
+              >
+                {activeUploadBadge.label}
+              </div>
             </div>
 
             <div className="grid gap-3 rounded-3xl border border-[#303F4B]/10 bg-white/35 p-4 md:grid-cols-2">
