@@ -24,7 +24,7 @@ function buildInstructions() {
 }
 
 export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
-  const model = options.model ?? "gpt-realtime-1.5";
+  const model = options.model ?? "gpt-realtime";
   const [state, setState] = useState<RealtimeTranscriptState>(createInitialTranscriptState());
   const connectionRef = useRef<{ close: () => void; sendText: (text: string) => void } | null>(
     null,

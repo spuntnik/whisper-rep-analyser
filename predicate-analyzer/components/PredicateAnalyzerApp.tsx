@@ -57,7 +57,7 @@ export function PredicateAnalyzerApp() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
-  const realtime = useRealtimeMeeting({ model: "gpt-realtime-1.5" });
+  const realtime = useRealtimeMeeting({ model: "gpt-realtime" });
   const firebaseServices = useMemo(() => getFirebaseClientServices(), []);
   const firebaseReady = Boolean(firebaseServices);
 

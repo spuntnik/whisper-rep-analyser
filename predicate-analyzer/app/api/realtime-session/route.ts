@@ -12,7 +12,7 @@ type RealtimeSessionRequestBody = {
 
 function buildPayload(body: RealtimeSessionRequestBody) {
   return {
-    model: body.model ?? "gpt-realtime-1.5",
+    model: body.model ?? "gpt-realtime",
     modalities: ["text"],
     input_audio_transcription: {
       model: "gpt-4o-mini-transcribe",
