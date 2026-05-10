@@ -190,26 +190,36 @@ export function MeetingReport({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div
+                className="grid w-full gap-3"
+                style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
+              >
                 {workflow.predicateAnalysis.channels.map((channel, index) => (
                   <div
                     key={channel.key}
-                    className="min-w-0 overflow-hidden rounded-2xl bg-white/70 p-4"
+                    className="min-w-[150px] overflow-hidden rounded-2xl bg-white/70 p-4"
                     style={{ borderTop: `4px solid ${reportMetricColor(index)}` }}
                   >
-                    <div className="flex min-w-0 items-center justify-between gap-3">
-                      <span className="min-w-0 break-normal whitespace-normal text-sm font-semibold leading-5">
-                        {channel.label}
-                      </span>
-                      <span className="shrink-0 text-sm tabular-nums">
-                        {channel.percentage.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="mt-3 h-2 rounded-full bg-[#303F4B]/10">
+                    <div className="space-y-2">
                       <div
-                        className="h-2 rounded-full"
-                        style={{ width: `${channel.percentage}%`, backgroundColor: channel.color }}
-                      />
+                        className="min-w-0 break-normal whitespace-normal text-sm font-semibold leading-5"
+                        style={{
+                          wordBreak: "normal",
+                          overflowWrap: "normal",
+                          whiteSpace: "normal",
+                        }}
+                      >
+                        {channel.label}
+                      </div>
+                      <div className="text-2xl font-semibold leading-none tabular-nums text-[#303F4B]">
+                        {channel.percentage.toFixed(1)}%
+                      </div>
+                      <div className="h-2 rounded-full bg-[#303F4B]/10">
+                        <div
+                          className="h-2 rounded-full"
+                          style={{ width: `${channel.percentage}%`, backgroundColor: channel.color }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

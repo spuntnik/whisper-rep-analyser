@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildMarkdownReport } from "@/lib/report";
 import { runAnalysisWorkflow, type AnalysisWorkflowResult } from "@/lib/analyze-workflow";
+import { formatTimestamp } from "@/lib/transcript";
 import type { TranscriptSegment, TranscriptionResult } from "@/lib/transcript";
 import { useRealtimeMeeting } from "@/hooks/use-realtime-meeting";
 import {
@@ -61,6 +62,290 @@ function formatDisplayDate(value: string) {
 
 function mergeSegments(existing: TranscriptSegment[], incoming: TranscriptSegment[]) {
   return [...existing, ...incoming].sort((left, right) => left.start - right.start);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildPrintableReportHtml(input: {
+  workflow: AnalysisWorkflowResult;
+  sourceLabel: string;
+  statusMessage: string;
+}) {
+  const { workflow, sourceLabel, statusMessage } = input;
+  const createdAt = new Date().toLocaleString();
+  const transcript = workflow.transcript.trim() || "No transcript available.";
+  const summary = workflow.meetingSummary.overview || "No summary available.";
+  const speakerStyle = workflow.meetingSummary.speakerStyleSummary || "No speaker style summary available.";
+  const buyingChannel = workflow.predicateAnalysis.buyingChannel || "Unknown";
+  const dominant = workflow.predicateAnalysis.dominantChannel?.label ?? "None";
+  const secondary = workflow.predicateAnalysis.secondaryChannel?.label ?? "None";
+  const confidence = workflow.predicateAnalysis.confidence;
+  const gap = `${workflow.predicateAnalysis.gap.toFixed(1)}%`;
+  const percentages = workflow.predicateAnalysis.channels
+    .map(
+      (channel) => `
+        <tr>
+          <td>${escapeHtml(channel.label)}</td>
+          <td>${channel.percentage.toFixed(1)}%</td>
+          <td>${channel.score}</td>
+        </tr>
+      `,
+    )
+    .join("");
+  const keyPoints = workflow.meetingSummary.keyPoints.length
+    ? workflow.meetingSummary.keyPoints
+        .map(
+          (point) => `
+            <li><span class="stamp">${escapeHtml(formatTimestamp(point.start))}</span>${escapeHtml(
+              point.text,
+            )}</li>
+          `,
+        )
+        .join("")
+    : `<li>No key points detected yet.</li>`;
+  const actionItems = workflow.meetingSummary.actionItems.length
+    ? workflow.meetingSummary.actionItems
+        .map(
+          (item) => `
+            <li><span class="stamp">${escapeHtml(formatTimestamp(item.start))}</span>${escapeHtml(
+              item.text,
+            )}</li>
+          `,
+        )
+        .join("")
+    : `<li>No explicit action items detected yet.</li>`;
+  const phrases = workflow.predicateAnalysis.phraseSuggestions.length
+    ? workflow.predicateAnalysis.phraseSuggestions
+        .map((phrase) => `<li>${escapeHtml(phrase)}</li>`)
+        .join("")
+    : `<li>No suggestions available.</li>`;
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(workflow.meetingSummary.title)} - Print View</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: #fff; color: #111827; }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        padding: 28px;
+        line-height: 1.5;
+      }
+      h1, h2, h3, p, ul, ol, table { margin: 0; }
+      .page {
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .hero {
+        border: 1px solid #d1d5db;
+        border-radius: 18px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .kicker {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #6b7280;
+        margin-bottom: 8px;
+      }
+      h1 {
+        font-size: 28px;
+        line-height: 1.2;
+        margin-bottom: 8px;
+      }
+      .meta {
+        color: #4b5563;
+        font-size: 13px;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card {
+        border: 1px solid #d1d5db;
+        border-radius: 16px;
+        padding: 16px;
+        background: #fff;
+      }
+      .card h2,
+      .card h3 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #6b7280;
+        margin-bottom: 10px;
+      }
+      .section {
+        margin-top: 14px;
+      }
+      .section-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #111827;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .table th,
+      .table td {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 10px 8px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 13px;
+      }
+      .table th {
+        color: #374151;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+      }
+      ul {
+        padding-left: 18px;
+      }
+      li + li {
+        margin-top: 8px;
+      }
+      .stamp {
+        display: inline-block;
+        min-width: 72px;
+        margin-right: 8px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        color: #111827;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        font-size: 13px;
+      }
+      .summary-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .metric {
+        border: 1px solid #d1d5db;
+        border-radius: 14px;
+        padding: 12px 14px;
+      }
+      .metric .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      .metric .value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #111827;
+      }
+      @media print {
+        body { padding: 0; }
+        .page { max-width: none; }
+      }
+      @page { margin: 12mm; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="hero">
+        <div class="kicker">DealIQ Report</div>
+        <h1>${escapeHtml(workflow.meetingSummary.title)}</h1>
+        <p class="meta">Generated ${escapeHtml(createdAt)} · Source: ${escapeHtml(sourceLabel)} · ${escapeHtml(statusMessage)}</p>
+      </div>
+
+      <div class="summary-row section">
+        <div class="metric">
+          <div class="label">Transcript Summary</div>
+          <div class="value">${escapeHtml(summary)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Speaker Style</div>
+          <div class="value">${escapeHtml(speakerStyle)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Dominant Channel</div>
+          <div class="value">${escapeHtml(dominant)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Secondary Channel</div>
+          <div class="value">${escapeHtml(secondary)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Confidence</div>
+          <div class="value">${escapeHtml(confidence)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Buying Channel</div>
+          <div class="value">${escapeHtml(buyingChannel)}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Channel Percentages</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Percentage</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>${percentages}</tbody>
+        </table>
+        <p class="meta" style="margin-top: 8px;">Gap: ${escapeHtml(gap)}</p>
+      </div>
+
+      <div class="grid two section">
+        <div class="card">
+          <h2>Transcript</h2>
+          <pre>${escapeHtml(transcript)}</pre>
+        </div>
+        <div class="card">
+          <h2>Suggested Phrases</h2>
+          <ul>${phrases}</ul>
+        </div>
+      </div>
+
+      <div class="grid two section">
+        <div class="card">
+          <h2>Detected Predicates</h2>
+          <ul>${keyPoints}</ul>
+        </div>
+        <div class="card">
+          <h2>Action Items</h2>
+          <ul>${actionItems}</ul>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
 }
 
 export function PredicateAnalyzerApp() {
@@ -419,7 +704,27 @@ export function PredicateAnalyzerApp() {
   }
 
   function onPrintPdf() {
-    window.print();
+    if (!workflow) return;
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=1400");
+    if (!printWindow) {
+      setErrorMessage("Unable to open print window. Please allow pop-ups and try again.");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(
+      buildPrintableReportHtml({
+        workflow,
+        sourceLabel,
+        statusMessage: displayStatusMessage,
+      }),
+    );
+    printWindow.document.close();
+    window.setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+    }, 250);
   }
 
   async function refreshRecentMeetings(token = firebaseToken) {
@@ -861,145 +1166,6 @@ export function PredicateAnalyzerApp() {
             onClearAll={onClearAll}
           />
 
-          {workflow ? (
-            <section className="print-only-report hidden overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-none print:block">
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-[0.24em] text-slate-500">DealIQ Report</div>
-                <h2 className="text-3xl font-semibold text-slate-900">
-                  {workflow.meetingSummary.title}
-                </h2>
-                <p className="text-sm leading-6 text-slate-600">
-                  Source: {sourceLabel} · {displayStatusMessage}
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Transcript Summary
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-800">
-                    {workflow.meetingSummary.overview}
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Dominant Channel
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {workflow.predicateAnalysis.dominantChannel?.label ?? "None"}
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Secondary Channel
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {workflow.predicateAnalysis.secondaryChannel?.label ?? "None"}
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Confidence
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {workflow.predicateAnalysis.confidence}
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Buying Channel
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-800">
-                    {workflow.predicateAnalysis.buyingChannel}
-                  </div>
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Gap
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {workflow.predicateAnalysis.gap.toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Detected Signals
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {workflow.meetingSummary.keyPoints.length > 0 ? (
-                      workflow.meetingSummary.keyPoints.map((point) => (
-                        <div
-                          key={`print-signal-${point.start}-${point.text}`}
-                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 break-words text-slate-800"
-                        >
-                          <span className="mr-2 rounded-full bg-slate-800 px-2 py-1 text-[11px] text-white">
-                            {point.start.toFixed(0)}s
-                          </span>
-                          {point.text}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-slate-600">No clear signals detected yet.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    Phrase Suggestions
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {workflow.predicateAnalysis.phraseSuggestions.length > 0 ? (
-                      workflow.predicateAnalysis.phraseSuggestions.map((phrase) => (
-                        <div
-                          key={`print-phrase-${phrase}`}
-                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 break-words text-slate-800"
-                        >
-                          {phrase}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-slate-600">No suggestions available.</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-                <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between text-sm font-medium text-slate-700">
-                    <span>Channel Percentages</span>
-                    <span>{workflow.predicateAnalysis.gap.toFixed(1)}% gap</span>
-                  </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {workflow.predicateAnalysis.channels.map((channel) => (
-                    <div
-                      key={`print-${channel.key}`}
-                      className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <div className="flex min-w-0 items-center justify-between gap-3">
-                        <span className="min-w-0 break-normal whitespace-normal text-sm font-semibold leading-5 text-slate-900">
-                          {channel.label}
-                        </span>
-                        <span className="shrink-0 text-sm tabular-nums text-slate-700">
-                          {channel.percentage.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="mt-3 h-2 rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full"
-                          style={{ width: `${channel.percentage}%`, backgroundColor: channel.color }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          ) : null}
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/10 p-6 text-white shadow-glow print:hidden">
