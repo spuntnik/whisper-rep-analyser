@@ -16,7 +16,7 @@ export const TRANSCRIPTION_MODEL_VALUES = [
 export type RealtimeModel = (typeof REALTIME_MODEL_VALUES)[number];
 export type TranscriptionModel = (typeof TRANSCRIPTION_MODEL_VALUES)[number];
 
-export const DEFAULT_REALTIME_MODEL: RealtimeModel = "gpt-realtime";
+export const DEFAULT_REALTIME_MODEL: RealtimeModel = "gpt-realtime-whisper";
 export const DEFAULT_TRANSCRIPTION_MODEL: TranscriptionModel = "gpt-4o-mini-transcribe";
 
 export const REALTIME_MODEL_OPTIONS = [
@@ -73,10 +73,8 @@ export const TRANSCRIPTION_MODEL_OPTIONS = [
   description: string;
 }>;
 
-const REALTIME_SESSION_ENDPOINT = "https://api.openai.com/v1/realtime";
+const REALTIME_CLIENT_SECRETS_ENDPOINT = "https://api.openai.com/v1/realtime/client_secrets";
 const REALTIME_CALLS_ENDPOINT = "https://api.openai.com/v1/realtime/calls";
-const REALTIME_TRANSLATION_ENDPOINT = "https://api.openai.com/v1/realtime/translations";
-const REALTIME_TRANSCRIPTION_ENDPOINT = "https://api.openai.com/v1/realtime/transcription_sessions";
 
 export type RealtimeSessionFamily = "realtime" | "translation" | "transcription";
 
@@ -174,26 +172,19 @@ export function getTranscriptionModelBadge(model?: string | null): RealtimeModel
 }
 
 export function getRealtimeConnectionEndpoint(model: RealtimeModel) {
-  switch (getRealtimeSessionFamily(model)) {
-    case "translation":
-      return REALTIME_TRANSLATION_ENDPOINT;
-    case "transcription":
-      return REALTIME_CALLS_ENDPOINT;
-    case "realtime":
-    default:
-      return REALTIME_SESSION_ENDPOINT;
-  }
+  void model;
+  return REALTIME_CALLS_ENDPOINT;
 }
 
 export function getRealtimeSessionCreationEndpoint(model: RealtimeModel) {
   switch (getRealtimeSessionFamily(model)) {
     case "translation":
-      return REALTIME_TRANSLATION_ENDPOINT;
+      return REALTIME_CLIENT_SECRETS_ENDPOINT;
     case "transcription":
-      return REALTIME_TRANSCRIPTION_ENDPOINT;
+      return REALTIME_CLIENT_SECRETS_ENDPOINT;
     case "realtime":
     default:
-      return REALTIME_SESSION_ENDPOINT;
+      return REALTIME_CLIENT_SECRETS_ENDPOINT;
   }
 }
 
@@ -207,62 +198,79 @@ export function buildRealtimeSessionPayload(input: {
 
   if (family === "translation") {
     return {
-      model,
-      instructions:
-        input.instructions ??
-        [
-          "You are a live speech translation engine.",
-          "Translate the speaker into clear English while preserving intent, names, and action items.",
-          "Emit concise transcript updates so downstream meeting analysis can summarize the call.",
-        ].join(" "),
+      session: {
+        type: "realtime" as const,
+        model,
+        output_modalities: ["text" as const],
+        instructions:
+          input.instructions ??
+          [
+            "You are a live speech translation engine.",
+            "Translate the speaker into clear English while preserving intent, names, and action items.",
+            "Emit concise transcript updates so downstream meeting analysis can summarize the call.",
+          ].join(" "),
+      },
     };
   }
 
   if (family === "transcription") {
     return {
-      type: "transcription",
-      audio: {
-        input: {
-          format: {
-            type: "audio/pcm",
-            rate: 24000,
-          },
-          transcription: {
-            model: "gpt-realtime-whisper",
-            language: input.language ?? "en",
-          },
-          turn_detection: {
-            type: "server_vad",
-            prefix_padding_ms: 300,
-            silence_duration_ms: 500,
-            threshold: 0.5,
+      session: {
+        type: "transcription" as const,
+        audio: {
+          input: {
+            format: {
+              type: "audio/pcm",
+              rate: 24000,
+            },
+            transcription: {
+              model: "gpt-realtime-whisper",
+              ...(input.language ? { language: input.language } : {}),
+            },
+            turn_detection: {
+              type: "server_vad" as const,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 500,
+              threshold: 0.5,
+            },
           },
         },
+        include: ["item.input_audio_transcription.logprobs"],
       },
-      include: ["item.input_audio_transcription.logprobs"],
     };
   }
 
   return {
-    model,
-    modalities: ["text"],
-    input_audio_transcription: {
-      model: "gpt-4o-mini-transcribe",
-      language: input.language ?? "en",
+    session: {
+      type: "realtime" as const,
+      model,
+      output_modalities: ["text" as const],
+      audio: {
+        input: {
+          format: {
+            type: "audio/pcm" as const,
+            rate: 24000,
+          },
+          turn_detection: {
+            type: "server_vad" as const,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 700,
+            threshold: 0.55,
+          },
+        },
+      },
+      transcription: {
+        model: "gpt-4o-mini-transcribe",
+        ...(input.language ? { language: input.language } : {}),
+      },
+      instructions:
+        input.instructions ??
+        [
+          "You are a live meeting transcription engine.",
+          "Transcribe the speaker accurately and emit concise transcript updates.",
+          "Do not answer questions unless explicitly asked to summarize.",
+          "Preserve action-item and intent language for downstream meeting analysis.",
+        ].join(" "),
     },
-    turn_detection: {
-      type: "server_vad",
-      prefix_padding_ms: 300,
-      silence_duration_ms: 700,
-      threshold: 0.55,
-    },
-    instructions:
-      input.instructions ??
-      [
-        "You are a live meeting transcription engine.",
-        "Transcribe the speaker accurately and emit concise transcript updates.",
-        "Do not answer questions unless explicitly asked to summarize.",
-        "Preserve action-item and intent language for downstream meeting analysis.",
-      ].join(" "),
   };
 }

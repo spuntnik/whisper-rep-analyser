@@ -24,6 +24,8 @@ type OpenAiTranscriptionPayload = {
   model?: string;
 };
 
+type SupportedTranscriptionResponseFormat = "json" | "text" | "verbose_json" | "diarized_json";
+
 function normalizeSegments(segments: OpenAiTranscriptionSegment[] | undefined) {
   return (segments ?? [])
     .map<TranscriptSegment>((segment) => ({
@@ -44,6 +46,32 @@ function chooseModel(requestedModel: string | null, useDiarization: boolean) {
   return normalized;
 }
 
+function chooseResponseFormat(
+  model: string,
+  requestedResponseFormat: string | null,
+  useDiarization: boolean,
+): SupportedTranscriptionResponseFormat {
+  const normalized = String(requestedResponseFormat ?? "").toLowerCase();
+  const wantsText = normalized === "text";
+  const wantsVerbose = normalized === "verbose_json";
+  const wantsDiarized = normalized === "diarized_json";
+
+  if (model === "whisper-1") {
+    if (wantsText) return "text";
+    return "verbose_json";
+  }
+
+  if (model === "gpt-4o-transcribe-diarize") {
+    if (wantsText) return "text";
+    if (wantsDiarized || useDiarization) return "diarized_json";
+    return "json";
+  }
+
+  if (wantsText) return "text";
+  if (wantsVerbose || wantsDiarized) return "json";
+  return "json";
+}
+
 export async function POST(request: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -56,7 +84,10 @@ export async function POST(request: NextRequest) {
   const requestedModelValue = formData.get("model");
   const requestedModel = typeof requestedModelValue === "string" ? requestedModelValue : null;
   const model = chooseModel(requestedModel, useDiarization);
-  const responseFormat = formData.get("responseFormat") === "text" ? "text" : "verbose_json";
+  const requestedResponseFormatValue = formData.get("responseFormat");
+  const requestedResponseFormat =
+    typeof requestedResponseFormatValue === "string" ? requestedResponseFormatValue : null;
+  const responseFormat = chooseResponseFormat(model, requestedResponseFormat, useDiarization);
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing audio file." }, { status: 400 });
@@ -64,12 +95,12 @@ export async function POST(request: NextRequest) {
 
   const audioFile = file as File;
 
-  async function submit(modelName: string) {
+  async function submit(modelName: string, format: SupportedTranscriptionResponseFormat) {
     const attempt = new FormData();
     attempt.append("file", audioFile);
     attempt.append("model", modelName);
-    attempt.append("response_format", responseFormat);
-    if (responseFormat === "verbose_json") {
+    attempt.append("response_format", format);
+    if (format === "verbose_json" && modelName === "whisper-1") {
       attempt.append("timestamp_granularities[]", "segment");
     }
 
@@ -83,12 +114,14 @@ export async function POST(request: NextRequest) {
   }
 
   let usedModel = model;
+  let usedResponseFormat = responseFormat;
   let warning: string | undefined;
-  let response = await submit(model);
+  let response = await submit(model, usedResponseFormat);
   if (!response.ok && useDiarization) {
     usedModel = DEFAULT_TRANSCRIPTION_MODEL;
     warning = "Speaker diarization fell back to GPT-4o mini Transcribe.";
-    response = await submit(DEFAULT_TRANSCRIPTION_MODEL);
+    usedResponseFormat = chooseResponseFormat(DEFAULT_TRANSCRIPTION_MODEL, requestedResponseFormat, false);
+    response = await submit(DEFAULT_TRANSCRIPTION_MODEL, usedResponseFormat);
   }
 
   if (!response.ok) {

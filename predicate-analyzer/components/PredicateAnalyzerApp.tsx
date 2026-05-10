@@ -241,7 +241,14 @@ export function PredicateAnalyzerApp() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("diarize", speakerDiarization ? "true" : "false");
-    formData.append("responseFormat", "verbose_json");
+    formData.append(
+      "responseFormat",
+      speakerDiarization
+        ? "diarized_json"
+        : transcriptionModel === "whisper-1"
+          ? "verbose_json"
+          : "json",
+    );
     formData.append("model", transcriptionModel);
 
     const response = await fetch("/api/transcribe", {
@@ -617,18 +624,21 @@ export function PredicateAnalyzerApp() {
                 },
                 { label: "Buying", value: workflow?.predicateAnalysis.buyingChannel ?? "Pending" },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl bg-[#303F4B]/35 p-4 text-[#E6DBBD]">
+                <div
+                  key={item.label}
+                  className="overflow-hidden rounded-2xl bg-[#303F4B]/35 p-4 text-[#E6DBBD]"
+                >
                   <div className="text-[11px] uppercase tracking-[0.24em] text-white/55">
                     {item.label}
                   </div>
-                  <div className="mt-2 text-sm font-medium leading-6">{item.value}</div>
+                  <div className="mt-2 break-words text-sm font-medium leading-6">{item.value}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="bg-[#303F4B] p-6 sm:p-8 lg:p-10">
-            <div className="rounded-[1.75rem] border border-white/10 bg-[#E6DBBD] p-5 text-[#303F4B]">
+            <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#E6DBBD] p-5 text-[#303F4B]">
               <div className="mb-3 flex items-center justify-between text-sm font-medium">
                 <span>Channel split</span>
                 <span>{workflow ? `${workflow.predicateAnalysis.gap.toFixed(1)}%` : "0.0%"} gap</span>
@@ -646,13 +656,13 @@ export function PredicateAnalyzerApp() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-[#FF7F00] p-4 text-[#303F4B]">
+            <div className="overflow-hidden rounded-2xl bg-[#FF7F00] p-4 text-[#303F4B]">
                 <div className="text-[11px] uppercase tracking-[0.24em]">Confidence</div>
                 <div className="mt-1 text-lg font-semibold">
                   {workflow?.predicateAnalysis.confidence ?? "Low"}
                 </div>
               </div>
-              <div className="rounded-2xl bg-[#1F63AA] p-4 text-white">
+            <div className="overflow-hidden rounded-2xl bg-[#1F63AA] p-4 text-white">
                 <div className="text-[11px] uppercase tracking-[0.24em]">Summary</div>
                 <div className="mt-1 text-lg font-semibold">
                   {workflow ? "Ready" : "Pending"}
@@ -830,11 +840,11 @@ export function PredicateAnalyzerApp() {
               </div>
             ) : null}
 
-            <div className="rounded-3xl border border-[#303F4B]/15 bg-white/50 p-4">
+            <div className="overflow-hidden rounded-3xl border border-[#303F4B]/15 bg-white/50 p-4">
               <div className="text-xs uppercase tracking-[0.24em] text-[#303F4B]/55">
                 Cleaned transcript
               </div>
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#303F4B]">
+              <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#303F4B]">
                 {workflow?.transcript || "Waiting for input..."}
               </div>
             </div>

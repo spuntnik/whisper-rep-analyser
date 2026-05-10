@@ -33,13 +33,20 @@ export async function POST(request: NextRequest) {
   const model = normalizeRealtimeModel(body.model);
   const creationEndpoint = getRealtimeSessionCreationEndpoint(model);
   const connectionEndpoint = getRealtimeConnectionEndpoint(model);
+  const requestBody = JSON.stringify({
+    expires_after: {
+      anchor: "created_at",
+      seconds: 600,
+    },
+    session: payload.session ?? payload,
+  });
   const response = await fetch(creationEndpoint, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: requestBody,
   });
 
   const text = await response.text();
@@ -55,7 +62,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = JSON.parse(text) as Record<string, unknown>;
+    const sessionObject =
+      typeof session.session === "object" && session.session !== null
+        ? (session.session as Record<string, unknown>)
+        : session;
     return NextResponse.json({
+      ...sessionObject,
       ...session,
       creation_endpoint: creationEndpoint,
       connection_endpoint: connectionEndpoint,

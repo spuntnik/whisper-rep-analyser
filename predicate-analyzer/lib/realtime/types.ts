@@ -14,7 +14,9 @@ export interface RealtimeSessionConfig {
 
 export interface RealtimeSessionResponse {
   model: string;
+  type?: "realtime" | "transcription";
   connection_endpoint?: string;
+  creation_endpoint?: string;
   instructions?: string;
   client_secret: {
     value: string;
@@ -23,7 +25,32 @@ export interface RealtimeSessionResponse {
       | {
           anchor: "created_at";
           seconds: number;
-        };
+      };
+  };
+  audio?: {
+    input?: {
+      format?: {
+        type?: "audio/pcm";
+        rate?: number;
+      };
+      transcription?: {
+        model?: "gpt-4o-transcribe" | "gpt-4o-mini-transcribe" | "whisper-1" | "gpt-realtime-whisper";
+        language?: string;
+        prompt?: string;
+      };
+      turn_detection?: {
+        type?: "server_vad" | "semantic_vad";
+        prefix_padding_ms?: number;
+        silence_duration_ms?: number;
+        threshold?: number;
+        eagerness?: "low" | "medium" | "high" | "auto";
+        create_response?: boolean;
+        interrupt_response?: boolean;
+      };
+      noise_reduction?: {
+        type?: "near_field" | "far_field";
+      } | null;
+    };
   };
   input_audio_format?: "pcm16" | "g711_ulaw" | "g711_alaw";
   input_audio_transcription?: {
@@ -31,7 +58,18 @@ export interface RealtimeSessionResponse {
     model?: "gpt-4o-transcribe" | "gpt-4o-mini-transcribe" | "whisper-1";
     prompt?: string;
   };
+  transcription?: {
+    language?: string;
+    model?:
+      | "gpt-4o-transcribe"
+      | "gpt-4o-mini-transcribe"
+      | "gpt-4o-transcribe-diarize"
+      | "whisper-1"
+      | "gpt-realtime-whisper";
+    prompt?: string;
+  };
   modalities?: Array<"text" | "audio">;
+  output_modalities?: Array<"text" | "audio">;
   turn_detection?: {
     type: "server_vad" | "semantic_vad";
     prefix_padding_ms?: number;
@@ -41,6 +79,7 @@ export interface RealtimeSessionResponse {
     create_response?: boolean;
     interrupt_response?: boolean;
   };
+  include?: string[];
 }
 
 export type RealtimeTranscriptKind = "delta" | "final";

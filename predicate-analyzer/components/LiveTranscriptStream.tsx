@@ -43,13 +43,13 @@ export function LiveTranscriptStream({ state }: LiveTranscriptStreamProps) {
   const modelBadge = getRealtimeModelBadge(state.model);
 
   return (
-    <section className="rounded-[1.75rem] border border-[#303F4B]/15 bg-white/55 p-4 text-[#303F4B]">
+    <section className="overflow-hidden rounded-[1.75rem] border border-[#303F4B]/15 bg-white/55 p-4 text-[#303F4B]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Live stream</div>
           <div className="mt-1 text-sm font-semibold">{state.statusMessage}</div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div
             className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${modelToneClass(
               modelBadge.tone,
@@ -64,9 +64,9 @@ export function LiveTranscriptStream({ state }: LiveTranscriptStreamProps) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-3xl border border-[#303F4B]/10 bg-[#E6DBBD]/55 p-4">
+      <div className="mt-4 overflow-hidden rounded-3xl border border-[#303F4B]/10 bg-[#E6DBBD]/55 p-4">
         <div className="text-xs uppercase tracking-[0.24em] text-[#535E8D]">Transcript</div>
-        <div className="mt-2 min-h-28 whitespace-pre-wrap text-sm leading-7">
+        <div className="mt-2 min-h-28 whitespace-pre-wrap break-words text-sm leading-7">
           {displayText || "Live transcript will appear here once the session starts."}
         </div>
       </div>
@@ -94,7 +94,7 @@ export function LiveTranscriptStream({ state }: LiveTranscriptStreamProps) {
           {state.segments.map((segment, index) => (
             <div
               key={`${segment.itemId ?? index}-${segment.start}-${segment.text}`}
-              className={`rounded-2xl px-3 py-2 text-sm leading-6 ${
+              className={`overflow-hidden rounded-2xl px-3 py-2 text-sm leading-6 break-words ${
                 segment.isPartial
                   ? "border border-[#FF7F00]/25 bg-[#FF7F00]/15"
                   : "border border-[#303F4B]/10 bg-white"
