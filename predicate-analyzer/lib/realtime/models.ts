@@ -74,6 +74,7 @@ export const TRANSCRIPTION_MODEL_OPTIONS = [
 }>;
 
 const REALTIME_SESSION_ENDPOINT = "https://api.openai.com/v1/realtime";
+const REALTIME_CALLS_ENDPOINT = "https://api.openai.com/v1/realtime/calls";
 const REALTIME_TRANSLATION_ENDPOINT = "https://api.openai.com/v1/realtime/translations";
 const REALTIME_TRANSCRIPTION_ENDPOINT = "https://api.openai.com/v1/realtime/transcription_sessions";
 
@@ -177,7 +178,7 @@ export function getRealtimeConnectionEndpoint(model: RealtimeModel) {
     case "translation":
       return REALTIME_TRANSLATION_ENDPOINT;
     case "transcription":
-      return REALTIME_TRANSCRIPTION_ENDPOINT;
+      return REALTIME_CALLS_ENDPOINT;
     case "realtime":
     default:
       return REALTIME_SESSION_ENDPOINT;
@@ -218,7 +219,28 @@ export function buildRealtimeSessionPayload(input: {
   }
 
   if (family === "transcription") {
-    return { model };
+    return {
+      type: "transcription",
+      audio: {
+        input: {
+          format: {
+            type: "audio/pcm",
+            rate: 24000,
+          },
+          transcription: {
+            model: "gpt-realtime-whisper",
+            language: input.language ?? "en",
+          },
+          turn_detection: {
+            type: "server_vad",
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
+            threshold: 0.5,
+          },
+        },
+      },
+      include: ["item.input_audio_transcription.logprobs"],
+    };
   }
 
   return {
