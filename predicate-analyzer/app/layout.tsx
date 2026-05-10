@@ -14,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <link rel="stylesheet" href="/app.css" />
+        {children}
+      </body>
     </html>
   );
 }
