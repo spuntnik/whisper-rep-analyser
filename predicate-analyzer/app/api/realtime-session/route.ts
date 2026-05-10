@@ -11,13 +11,11 @@ export const runtime = "nodejs";
 type RealtimeSessionRequestBody = {
   model?: string;
   instructions?: string;
-  language?: string;
 };
 
 function buildPayload(body: RealtimeSessionRequestBody) {
   return buildRealtimeSessionPayload({
     model: normalizeRealtimeModel(body.model),
-    language: body.language,
     instructions: body.instructions,
   });
 }

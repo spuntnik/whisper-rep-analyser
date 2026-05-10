@@ -14,7 +14,6 @@ export interface RealtimeSessionConfig {
 
 export interface RealtimeSessionResponse {
   model: string;
-  type?: "realtime" | "transcription";
   connection_endpoint?: string;
   creation_endpoint?: string;
   instructions?: string;
@@ -34,7 +33,7 @@ export interface RealtimeSessionResponse {
         rate?: number;
       };
       transcription?: {
-        model?: "gpt-4o-transcribe" | "gpt-4o-mini-transcribe" | "whisper-1" | "gpt-realtime-whisper";
+        model?: "gpt-4o-transcribe" | "gpt-4o-mini-transcribe" | "whisper-1";
         language?: string;
         prompt?: string;
       };
@@ -56,16 +55,6 @@ export interface RealtimeSessionResponse {
   input_audio_transcription?: {
     language?: string;
     model?: "gpt-4o-transcribe" | "gpt-4o-mini-transcribe" | "whisper-1";
-    prompt?: string;
-  };
-  transcription?: {
-    language?: string;
-    model?:
-      | "gpt-4o-transcribe"
-      | "gpt-4o-mini-transcribe"
-      | "gpt-4o-transcribe-diarize"
-      | "whisper-1"
-      | "gpt-realtime-whisper";
     prompt?: string;
   };
   modalities?: Array<"text" | "audio">;

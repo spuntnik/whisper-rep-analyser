@@ -16,7 +16,6 @@ import type {
 
 export interface UseRealtimeMeetingOptions {
   model?: string;
-  language?: string;
 }
 
 function buildInstructionsForModel(model: string) {
@@ -27,14 +26,6 @@ function buildInstructionsForModel(model: string) {
       "You are a live speech translation engine.",
       "Translate the speaker into clear English while preserving intent, names, and action items.",
       "Emit concise transcript updates so downstream meeting analysis can summarize the call.",
-    ].join(" ");
-  }
-
-  if (family === "transcription") {
-    return [
-      "You are a live transcription engine.",
-      "Transcribe the speaker accurately and emit concise transcript updates.",
-      "Preserve action-item language and speaker boundaries for downstream analysis.",
     ].join(" ");
   }
 
@@ -78,7 +69,6 @@ export function useRealtimeMeeting(options: UseRealtimeMeetingOptions = {}) {
       },
       body: JSON.stringify({
         model,
-        language: options.language ?? "en",
         instructions: buildInstructionsForModel(model),
       }),
     });

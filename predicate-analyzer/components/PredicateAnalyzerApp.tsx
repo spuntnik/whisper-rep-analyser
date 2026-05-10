@@ -244,7 +244,7 @@ export function PredicateAnalyzerApp() {
     formData.append(
       "responseFormat",
       speakerDiarization
-        ? "diarized_json"
+        ? "json"
         : transcriptionModel === "whisper-1"
           ? "verbose_json"
           : "json",
@@ -860,6 +860,146 @@ export function PredicateAnalyzerApp() {
             onSaveToFirebase={workflow ? () => void saveCurrentWorkflow() : undefined}
             onClearAll={onClearAll}
           />
+
+          {workflow ? (
+            <section className="print-only-report hidden overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 text-slate-900 shadow-none print:block">
+              <div className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-500">DealIQ Report</div>
+                <h2 className="text-3xl font-semibold text-slate-900">
+                  {workflow.meetingSummary.title}
+                </h2>
+                <p className="text-sm leading-6 text-slate-600">
+                  Source: {sourceLabel} · {displayStatusMessage}
+                </p>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Transcript Summary
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-800">
+                    {workflow.meetingSummary.overview}
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Dominant Channel
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">
+                    {workflow.predicateAnalysis.dominantChannel?.label ?? "None"}
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Secondary Channel
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">
+                    {workflow.predicateAnalysis.secondaryChannel?.label ?? "None"}
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Confidence
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">
+                    {workflow.predicateAnalysis.confidence}
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Buying Channel
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-800">
+                    {workflow.predicateAnalysis.buyingChannel}
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Gap
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">
+                    {workflow.predicateAnalysis.gap.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Detected Signals
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {workflow.meetingSummary.keyPoints.length > 0 ? (
+                      workflow.meetingSummary.keyPoints.map((point) => (
+                        <div
+                          key={`print-signal-${point.start}-${point.text}`}
+                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 break-words text-slate-800"
+                        >
+                          <span className="mr-2 rounded-full bg-slate-800 px-2 py-1 text-[11px] text-white">
+                            {point.start.toFixed(0)}s
+                          </span>
+                          {point.text}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-slate-600">No clear signals detected yet.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                    Phrase Suggestions
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {workflow.predicateAnalysis.phraseSuggestions.length > 0 ? (
+                      workflow.predicateAnalysis.phraseSuggestions.map((phrase) => (
+                        <div
+                          key={`print-phrase-${phrase}`}
+                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 break-words text-slate-800"
+                        >
+                          {phrase}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-slate-600">No suggestions available.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+                <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between text-sm font-medium text-slate-700">
+                    <span>Channel Percentages</span>
+                    <span>{workflow.predicateAnalysis.gap.toFixed(1)}% gap</span>
+                  </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {workflow.predicateAnalysis.channels.map((channel) => (
+                    <div
+                      key={`print-${channel.key}`}
+                      className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex min-w-0 items-center justify-between gap-3">
+                        <span className="min-w-0 break-normal whitespace-normal text-sm font-semibold leading-5 text-slate-900">
+                          {channel.label}
+                        </span>
+                        <span className="shrink-0 text-sm tabular-nums text-slate-700">
+                          {channel.percentage.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="mt-3 h-2 rounded-full bg-slate-200">
+                        <div
+                          className="h-2 rounded-full"
+                          style={{ width: `${channel.percentage}%`, backgroundColor: channel.color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/10 p-6 text-white shadow-glow print:hidden">

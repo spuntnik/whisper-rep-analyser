@@ -32,6 +32,10 @@ body {
 }
 
 @media print {
+  @page {
+    margin: 12mm;
+  }
+
   html {
     background: #ffffff !important;
   }
@@ -43,27 +47,24 @@ body {
     print-color-adjust: exact;
   }
 
-  main *:not(:has(.print-only-report)):not(.print-only-report) {
+  body * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  main > :not(.print-only-report) {
     display: none !important;
   }
 
   .print-only-report {
     display: block !important;
     visibility: visible !important;
-    page-break-inside: avoid;
+    color: #111827 !important;
+    background: #ffffff !important;
   }
 
   .print-only-report * {
-    display: revert !important;
-    visibility: visible !important;
-  }
-
-  .print-only-report canvas {
-    display: none !important;
-  }
-
-  .print-only-report * {
-    box-shadow: none !important;
-    text-shadow: none !important;
+    color: #111827 !important;
+    background-color: transparent !important;
   }
 }
