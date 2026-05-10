@@ -5,6 +5,13 @@ const projectRoot = process.cwd();
 const standaloneRoot = join(projectRoot, ".next", "standalone");
 const staticSource = join(projectRoot, ".next", "static");
 const publicSource = join(projectRoot, "public");
+const staticCssSourceDir = join(projectRoot, ".next", "static", "css");
+const stableCssSource = existsSync(staticCssSourceDir)
+  ? readdirSync(staticCssSourceDir)
+      .filter((entry) => entry.endsWith(".css"))
+      .map((entry) => join(staticCssSourceDir, entry))
+      .sort()[0]
+  : null;
 
 function findServerDirectory(root) {
   if (!existsSync(root)) {
@@ -59,6 +66,12 @@ const publicDestination = join(serverDirectory, "public");
 
 const copiedStatic = copyIfPresent(staticSource, nextDestination);
 const copiedPublic = copyIfPresent(publicSource, publicDestination);
+
+if (stableCssSource) {
+  const stableCssDestination = join(publicSource, "app.css");
+  mkdirSync(publicSource, { recursive: true });
+  cpSync(stableCssSource, stableCssDestination);
+}
 
 const wrapperServerPath = join(standaloneRoot, "server.js");
 const nestedServerRelativePath = "./whisper/predicate-analyzer/server.js";

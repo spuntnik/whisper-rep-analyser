@@ -14,6 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="stylesheet" href="/app.css" />
+      </head>
       <body>{children}</body>
     </html>
   );
