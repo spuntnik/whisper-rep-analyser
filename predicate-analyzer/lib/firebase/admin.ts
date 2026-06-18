@@ -15,10 +15,18 @@ function getAdminApp() {
     return initializeApp({
       credential: cert(serviceAccount),
       projectId: serviceAccount.projectId,
+      storageBucket: serviceAccount.storageBucket,
     });
   }
 
-  return initializeApp();
+  try {
+    return initializeApp();
+  } catch (error) {
+    console.error("Firebase admin initialization failed:", error);
+    throw new Error(
+      "Firebase admin could not be initialized. Ensure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set.",
+    );
+  }
 }
 
 export function getFirebaseAdminFirestore() {
